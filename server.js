@@ -185,6 +185,9 @@ function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
     pageSetup: {
       orientation: 'landscape',
       paperSize: 9,
+      fitToPage: true,
+      fitToWidth: 1,
+      fitToHeight: 0,
       margins: { left: 0.24, right: 0, top: 0.75, bottom: 0.75, header: 0, footer: 0 }
     }
   });

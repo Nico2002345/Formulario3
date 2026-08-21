@@ -179,7 +179,7 @@ const THIN_BORDER = { style: 'thin' };
 const ALL_BORDERS = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
 const LEGAL_TEXT = 'Mediante el registro de sus datos personales en el presente formato usted autoriza al área responsable del manejo del mismo, para la recolección, almacenamiento y uso de la información con el fin de generar informes y para que obre como evidencia de realización de la presente acta. En cumplimiento a la ley 1581 de 2012, se le informa que como titular de la información tiene derecho a conocer, actualizar y ratificar sus datos personales solicitar pruebas de la autorización otorgada para su tratamiento, ser informado sobre el uso que se le ha dado de los mismos, presentar quejas ante la SIC por infracción a la ley, revocar la autorización y/o Solicitar la  supervisión de sus datos en los casos en que sea procedente y acceder en forma gratuita a los mismos.';
 
-function construirHojaEvento(workbook, colombiaImageId, evento) {
+function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
   const nombreHoja = `Evento ${evento.id}`.slice(0, 31);
   const ws = workbook.addWorksheet(nombreHoja, {
     pageSetup: {
@@ -213,10 +213,11 @@ function construirHojaEvento(workbook, colombiaImageId, evento) {
   ws.getCell('C1').font = { name: 'Arial', size: 10, bold: true };
   ws.getCell('C1').alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
   ws.addImage(colombiaImageId, { tl: { col: 19.2, row: 0.05 }, ext: { width: 65, height: 62 } });
+  ws.addImage(vaupesImageId, { tl: { col: 1.4, row: 0.05 }, ext: { width: 55, height: 66 } });
 
   ws.mergeCells('D2:G2'); ws.mergeCells('H2:L2'); ws.mergeCells('M2:O2');
   ws.getCell('C2').value = 'Proceso:';
-  ws.getCell('D2').value = 'Asistencia territorial y desarrollo institucional';
+  ws.getCell('D2').value = 'Direccionamiento Estratégico y Articulación Regional';
   ws.getCell('H2').value = 'Código';
   ws.getCell('M2').value = 'Versión';
 
@@ -362,10 +363,14 @@ app.get('/api/export/excel', async (req, res) => {
       filename: path.join(__dirname, 'public', 'assets', 'excel', 'colombia.png'),
       extension: 'png'
     });
+    const vaupesImageId = workbook.addImage({
+      filename: path.join(__dirname, 'public', 'assets', 'excel', 'vaupes.png'),
+      extension: 'png'
+    });
 
     eventos.forEach(eventoResumen => {
       const evento = db.getEventoById(eventoResumen.id);
-      construirHojaEvento(workbook, colombiaImageId, evento);
+      construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento);
     });
 
     if (eventos.length === 0) {

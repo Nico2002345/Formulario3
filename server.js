@@ -150,56 +150,227 @@ app.delete('/api/asistentes/:id', (req, res) => {
   }
 });
 
-// ---------- EXPORTAR A EXCEL ----------
+// ---------- EXPORTAR A EXCEL (formato oficial MI-AT-FO002-1-2 v2) ----------
+
+const GRUPOS_ETAREOS = [
+  'Primera infancia 0-5 años',
+  'Infancia 6-13 años',
+  'Jóvenes 14-28 años',
+  'Adulto 29-59 años',
+  'Adulto mayor 60 años'
+];
+
+const GRUPOS_VALOR = [
+  'Indígena',
+  'Afrodescendiente',
+  'Persona con discapacidad',
+  'LGBTI o población diversa',
+  'Víctima del conflicto armado interno',
+  'Minorías religiosas',
+  'Persona en proceso de reincorporación',
+  'Líder o lideresa social',
+  'Autoridad indígena tradicional',
+  'No aplica'
+];
+
+const ETAREO_COLS = ['H', 'I', 'J', 'K', 'L'];
+const VALOR_COLS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'];
+const THIN_BORDER = { style: 'thin' };
+const ALL_BORDERS = { top: THIN_BORDER, bottom: THIN_BORDER, left: THIN_BORDER, right: THIN_BORDER };
+const LEGAL_TEXT = 'Mediante el registro de sus datos personales en el presente formato usted autoriza al área responsable del manejo del mismo, para la recolección, almacenamiento y uso de la información con el fin de generar informes y para que obre como evidencia de realización de la presente acta. En cumplimiento a la ley 1581 de 2012, se le informa que como titular de la información tiene derecho a conocer, actualizar y ratificar sus datos personales solicitar pruebas de la autorización otorgada para su tratamiento, ser informado sobre el uso que se le ha dado de los mismos, presentar quejas ante la SIC por infracción a la ley, revocar la autorización y/o Solicitar la  supervisión de sus datos en los casos en que sea procedente y acceder en forma gratuita a los mismos.';
+
+function construirHojaEvento(workbook, colombiaImageId, evento) {
+  const nombreHoja = `Evento ${evento.id}`.slice(0, 31);
+  const ws = workbook.addWorksheet(nombreHoja, {
+    pageSetup: {
+      orientation: 'landscape',
+      paperSize: 9,
+      margins: { left: 0.24, right: 0, top: 0.75, bottom: 0.75, header: 0, footer: 0 }
+    }
+  });
+
+  const anchos = {
+    A: 3.44, B: 31.33, C: 27.55, D: 17.44, E: 24.55, F: 3.55, G: 4.11,
+    H: 3.33, I: 2.66, J: 14.44, K: 14.44, L: 4.0, M: 2.66, N: 14.44,
+    O: 14.44, P: 14.44, Q: 14.44, R: 14.44, S: 14.44, T: 14.44, U: 14.44,
+    V: 3.89, W: 15.11
+  };
+  Object.entries(anchos).forEach(([col, w]) => { ws.getColumn(col).width = w; });
+
+  ws.getRow(1).height = 18;
+  ws.getRow(2).height = 16.5;
+  ws.getRow(3).height = 18;
+  ws.getRow(4).height = 14.25;
+  ws.getRow(5).height = 13.5;
+  ws.getRow(6).height = 14.25;
+  ws.getRow(7).height = 13.5;
+  ws.getRow(8).height = 154.5;
+
+  ws.mergeCells('A1:B3');
+  ws.mergeCells('C1:O1');
+  ws.mergeCells('P1:W3');
+  ws.getCell('C1').value = 'DEPARTAMENTO DE VAUPÉS';
+  ws.getCell('C1').font = { name: 'Arial', size: 10, bold: true };
+  ws.getCell('C1').alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+  ws.addImage(colombiaImageId, { tl: { col: 19.2, row: 0.05 }, ext: { width: 65, height: 62 } });
+
+  ws.mergeCells('D2:G2'); ws.mergeCells('H2:L2'); ws.mergeCells('M2:O2');
+  ws.getCell('C2').value = 'Proceso:';
+  ws.getCell('D2').value = 'Asistencia territorial y desarrollo institucional';
+  ws.getCell('H2').value = 'Código';
+  ws.getCell('M2').value = 'Versión';
+
+  ws.mergeCells('D3:G3'); ws.mergeCells('H3:L3'); ws.mergeCells('M3:O3');
+  ws.getCell('C3').value = 'Formato:';
+  ws.getCell('D3').value = 'Lista de asistencia ';
+  ws.getCell('H3').value = 'ES-DE-PR002-16-4.2';
+  ws.getCell('M3').value = 3;
+
+  [
+    ['C2', 10, true], ['D2', 10, false], ['H2', 10, true], ['M2', 10, true],
+    ['C3', 10, true], ['D3', 10, false], ['H3', 8, false], ['M3', 8, false]
+  ].forEach(([coord, size, bold]) => {
+    ws.getCell(coord).font = { name: 'Arial', size, bold };
+    ws.getCell(coord).alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+  });
+
+  ws.mergeCells('A4:D4'); ws.mergeCells('E4:W4');
+  ws.getCell('A4').value = `TEMA O EVENTO: ${evento.tema_evento || ''}`;
+  ws.getCell('E4').value = `ORGANIZADO POR: ${evento.organizado_por || ''}`;
+
+  ws.mergeCells('A5:D5'); ws.mergeCells('E5:W5');
+  ws.getCell('A5').value = `CIUDAD: ${evento.ciudad || ''}`;
+  ws.getCell('E5').value = `LUGAR: ${evento.lugar || ''}`;
+
+  ws.mergeCells('A6:C6'); ws.mergeCells('D6:E6'); ws.mergeCells('F6:W6');
+  ws.getCell('A6').value = `FECHA: ${evento.fecha || ''}`;
+  ws.getCell('D6').value = `HORA INICIO: ${evento.hora_inicio || ''}`;
+  ws.getCell('F6').value = `HORA FINAL: ${evento.hora_final || ''}`;
+
+  ['A4', 'E4', 'A5', 'E5', 'A6', 'D6', 'F6'].forEach(coord => {
+    ws.getCell(coord).font = { name: 'Arial', size: 8, bold: true };
+    ws.getCell(coord).alignment = { horizontal: 'left', vertical: 'center' };
+  });
+
+  ws.mergeCells('A7:E7'); ws.mergeCells('F7:G7'); ws.mergeCells('H7:L7');
+  ws.mergeCells('M7:V7'); ws.mergeCells('W7:W8');
+  ws.getCell('A7').value = 'DATOS DE IDENTIFICACION';
+  ws.getCell('F7').value = 'SEXO';
+  ws.getCell('H7').value = 'ETAREOS';
+  ws.getCell('M7').value = 'GRUPO DE VALOR';
+  ws.getCell('W7').value = 'Firma';
+  ['A7', 'F7', 'H7', 'M7', 'W7'].forEach(coord => {
+    ws.getCell(coord).font = { name: 'Arial', size: 8, bold: coord !== 'W7' };
+    ws.getCell(coord).alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+  });
+
+  const row8 = {
+    A: 'N°', B: 'NOMBRES Y APELLIDOS', C: 'ENTIDAD, DEPENDENCIA, ORGANIZACIÓN O GRUPO SOCIAL',
+    D: 'CELULAR', E: 'CORREO ELECTRONICO', F: 'H', G: 'M'
+  };
+  Object.entries(row8).forEach(([col, val]) => {
+    const cell = ws.getCell(`${col}8`);
+    cell.value = val;
+    cell.font = { name: 'Arial', size: 8 };
+    cell.alignment = { horizontal: 'center', vertical: 'center', wrapText: true };
+  });
+  ETAREO_COLS.forEach((col, i) => {
+    const cell = ws.getCell(`${col}8`);
+    cell.value = GRUPOS_ETAREOS[i];
+    cell.font = { name: 'Arial', size: 8 };
+    cell.alignment = { horizontal: 'center', vertical: 'center', textRotation: 90 };
+  });
+  VALOR_COLS.forEach((col, i) => {
+    const cell = ws.getCell(`${col}8`);
+    cell.value = GRUPOS_VALOR[i];
+    cell.font = { name: 'Arial', size: 8 };
+    cell.alignment = { horizontal: 'center', vertical: 'center', textRotation: 90 };
+  });
+
+  const asistentes = evento.asistentes || [];
+  const totalFilas = Math.max(16, asistentes.length);
+  for (let i = 0; i < totalFilas; i++) {
+    const fila = 9 + i;
+    ws.getRow(fila).height = 21;
+    const a = asistentes[i];
+
+    ws.getCell(`A${fila}`).value = i + 1;
+    if (a) {
+      ws.getCell(`B${fila}`).value = a.nombres_apellidos || '';
+      ws.getCell(`C${fila}`).value = a.entidad_dependencia || '';
+      ws.getCell(`D${fila}`).value = a.celular || '';
+      ws.getCell(`E${fila}`).value = a.correo_electronico || '';
+      if (a.sexo === 'H') ws.getCell(`F${fila}`).value = 'X';
+      if (a.sexo === 'M') ws.getCell(`G${fila}`).value = 'X';
+      const idxEtareo = GRUPOS_ETAREOS.indexOf(a.grupo_etareo);
+      if (idxEtareo >= 0) ws.getCell(`${ETAREO_COLS[idxEtareo]}${fila}`).value = 'X';
+      (a.grupo_valor || []).forEach(gv => {
+        const idxValor = GRUPOS_VALOR.indexOf(gv);
+        if (idxValor >= 0) ws.getCell(`${VALOR_COLS[idxValor]}${fila}`).value = 'X';
+      });
+      if (a.firma) {
+        try {
+          const base64 = a.firma.split(',')[1];
+          const firmaImageId = workbook.addImage({ base64, extension: 'png' });
+          ws.addImage(firmaImageId, { tl: { col: 22.1, row: fila - 1 + 0.1 }, ext: { width: 95, height: 18 } });
+        } catch (e) { /* firma corrupta, se omite */ }
+      }
+    }
+
+    for (let c = 1; c <= 23; c++) {
+      const cell = ws.getRow(fila).getCell(c);
+      cell.border = ALL_BORDERS;
+      cell.font = { name: 'Arial', size: 8 };
+      cell.alignment = { horizontal: 'center', vertical: 'center' };
+    }
+    ws.getCell(`B${fila}`).alignment = { horizontal: 'left', vertical: 'center' };
+    ws.getCell(`C${fila}`).alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+  }
+
+  const filaObs = 9 + totalFilas;
+  ws.mergeCells(`A${filaObs}:B${filaObs}`);
+  ws.mergeCells(`C${filaObs}:W${filaObs}`);
+  ws.getCell(`A${filaObs}`).value = 'OBSERVACIONES:';
+  ws.getCell(`A${filaObs}`).font = { name: 'Calibri', size: 8, bold: true };
+  ws.getCell(`A${filaObs}`).alignment = { horizontal: 'center', vertical: 'center' };
+  ws.getCell(`C${filaObs}`).value = evento.observaciones || '';
+  ws.getCell(`C${filaObs}`).font = { name: 'Calibri', size: 8 };
+  ws.getCell(`C${filaObs}`).alignment = { horizontal: 'left', vertical: 'center', wrapText: true };
+
+  const filaLegal = filaObs + 1;
+  ws.mergeCells(`A${filaLegal}:W${filaLegal + 1}`);
+  ws.getRow(filaLegal + 1).height = 29.25;
+  ws.getCell(`A${filaLegal}`).value = LEGAL_TEXT;
+  ws.getCell(`A${filaLegal}`).font = { name: 'Calibri', size: 8 };
+  ws.getCell(`A${filaLegal}`).alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+
+  const ultimaFila = filaLegal + 1;
+  for (let r = 1; r <= ultimaFila; r++) {
+    for (let c = 1; c <= 23; c++) {
+      ws.getRow(r).getCell(c).border = ALL_BORDERS;
+    }
+  }
+
+  return ws;
+}
 
 app.get('/api/export/excel', async (req, res) => {
   try {
     const eventos = db.getEventos('');
-    const asistentes = db.getAllAsistentesForExport();
-
     const workbook = new ExcelJS.Workbook();
+    const colombiaImageId = workbook.addImage({
+      filename: path.join(__dirname, 'public', 'assets', 'excel', 'colombia.png'),
+      extension: 'png'
+    });
 
-    const eventosSheet = workbook.addWorksheet('Eventos');
-    eventosSheet.columns = [
-      { header: 'ID', key: 'id', width: 6 },
-      { header: 'Tema o Evento', key: 'tema_evento', width: 30 },
-      { header: 'Organizado por', key: 'organizado_por', width: 22 },
-      { header: 'Ciudad', key: 'ciudad', width: 16 },
-      { header: 'Lugar', key: 'lugar', width: 20 },
-      { header: 'Fecha', key: 'fecha', width: 12 },
-      { header: 'Hora inicio', key: 'hora_inicio', width: 10 },
-      { header: 'Hora final', key: 'hora_final', width: 10 },
-      { header: 'Total asistentes', key: 'total_asistentes', width: 14 },
-      { header: 'Observaciones', key: 'observaciones', width: 30 },
-      { header: 'Creado', key: 'created_at', width: 18 }
-    ];
-    eventosSheet.getRow(1).font = { bold: true };
-    eventos.forEach((e, idx) => eventosSheet.addRow({ ...e, id: idx + 1 }));
+    eventos.forEach(eventoResumen => {
+      const evento = db.getEventoById(eventoResumen.id);
+      construirHojaEvento(workbook, colombiaImageId, evento);
+    });
 
-    const asistentesSheet = workbook.addWorksheet('Asistentes');
-    asistentesSheet.columns = [
-      { header: 'Tema o Evento', key: 'tema_evento', width: 26 },
-      { header: 'Organizado por', key: 'organizado_por', width: 20 },
-      { header: 'Ciudad', key: 'ciudad', width: 14 },
-      { header: 'Lugar', key: 'lugar', width: 18 },
-      { header: 'Fecha', key: 'fecha', width: 12 },
-      { header: 'Hora inicio', key: 'hora_inicio', width: 10 },
-      { header: 'Hora final', key: 'hora_final', width: 10 },
-      { header: 'Nombres y Apellidos', key: 'nombres_apellidos', width: 26 },
-      { header: 'Entidad, Dependencia, Organización o Grupo Social', key: 'entidad_dependencia', width: 30 },
-      { header: 'Celular', key: 'celular', width: 14 },
-      { header: 'Correo Electrónico', key: 'correo_electronico', width: 24 },
-      { header: 'Sexo', key: 'sexo', width: 6 },
-      { header: 'Grupo Etáreo', key: 'grupo_etareo', width: 22 },
-      { header: 'Grupo de Valor', key: 'grupo_valor', width: 34 },
-      { header: 'Firma', key: 'firma', width: 12 }
-    ];
-    asistentesSheet.getRow(1).font = { bold: true };
-    asistentes.forEach(a => asistentesSheet.addRow({
-      ...a,
-      grupo_valor: (a.grupo_valor || []).join(', '),
-      firma: a.firma ? 'Firmado' : 'Sin firmar'
-    }));
+    if (eventos.length === 0) {
+      workbook.addWorksheet('Sin eventos').getCell('A1').value = 'No hay eventos registrados';
+    }
 
     const fecha = new Date().toISOString().slice(0, 10);
     res.setHeader('Content-Disposition', `attachment; filename=lista_asistencia_${fecha}.xlsx`);

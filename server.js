@@ -174,7 +174,7 @@ app.get('/api/export/excel', async (req, res) => {
       { header: 'Creado', key: 'created_at', width: 18 }
     ];
     eventosSheet.getRow(1).font = { bold: true };
-    eventos.forEach(e => eventosSheet.addRow(e));
+    eventos.forEach((e, idx) => eventosSheet.addRow({ ...e, id: idx + 1 }));
 
     const asistentesSheet = workbook.addWorksheet('Asistentes');
     asistentesSheet.columns = [

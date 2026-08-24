@@ -7,6 +7,9 @@
     eventosCache: []
   };
 
+  const AUTO_REFRESH_MS = 5000;
+  let autoRefreshTimer = null;
+
   // ---------- Helpers ----------
 
   const $ = sel => document.querySelector(sel);
@@ -55,6 +58,7 @@
   // ---------- Vistas ----------
 
   function mostrarVistaEventos() {
+    detenerAutoRefresco();
     $('#view-eventos').classList.remove('d-none');
     $('#view-detalle').classList.add('d-none');
     state.eventoActualId = null;
@@ -66,6 +70,26 @@
     $('#view-detalle').classList.remove('d-none');
     state.eventoActualId = id;
     cargarDetalle(id);
+    iniciarAutoRefresco();
+  }
+
+  function hayModalAbierto() {
+    return $$('.modal.show').length > 0;
+  }
+
+  function iniciarAutoRefresco() {
+    detenerAutoRefresco();
+    autoRefreshTimer = setInterval(() => {
+      if (document.hidden || hayModalAbierto() || !state.eventoActualId) return;
+      cargarDetalle(state.eventoActualId, { silencioso: true });
+    }, AUTO_REFRESH_MS);
+  }
+
+  function detenerAutoRefresco() {
+    if (autoRefreshTimer) {
+      clearInterval(autoRefreshTimer);
+      autoRefreshTimer = null;
+    }
   }
 
   // ---------- Eventos ----------
@@ -239,20 +263,40 @@
 
   // ---------- Detalle / Asistentes ----------
 
-  async function cargarDetalle(id) {
-    const ev = await api(`/api/eventos/${id}`);
-    $('#detalleTema').textContent = ev.tema_evento;
-    const metaParts = [];
-    if (ev.fecha) metaParts.push(`📅 ${ev.fecha}`);
-    if (ev.hora_inicio || ev.hora_final) metaParts.push(`🕐 ${ev.hora_inicio || '?'} - ${ev.hora_final || '?'}`);
-    if (ev.lugar) metaParts.push(`📍 ${ev.lugar}`);
-    if (ev.ciudad) metaParts.push(ev.ciudad);
-    if (ev.organizado_por) metaParts.push(`Organiza: ${ev.organizado_por}`);
-    $('#detalleMeta').textContent = metaParts.join('  ·  ') || 'Sin información adicional';
-    $('#detalleObs').textContent = ev.observaciones ? `Observaciones: ${ev.observaciones}` : '';
+  async function cargarDetalle(id, { silencioso = false } = {}) {
+    let ev;
+    try {
+      ev = await api(`/api/eventos/${id}`);
+    } catch (err) {
+      if (!silencioso) toast(err.message);
+      return;
+    }
 
-    state.asistentesCache = ev.asistentes || [];
-    renderAsistentes(state.asistentesCache);
+    const nuevosAsistentes = ev.asistentes || [];
+    const cambioAsistentes = !silencioso ||
+      nuevosAsistentes.length !== state.asistentesCache.length ||
+      JSON.stringify(nuevosAsistentes.map(a => a.id)) !== JSON.stringify(state.asistentesCache.map(a => a.id));
+
+    if (!silencioso) {
+      $('#detalleTema').textContent = ev.tema_evento;
+      const metaParts = [];
+      if (ev.fecha) metaParts.push(`📅 ${ev.fecha}`);
+      if (ev.hora_inicio || ev.hora_final) metaParts.push(`🕐 ${ev.hora_inicio || '?'} - ${ev.hora_final || '?'}`);
+      if (ev.lugar) metaParts.push(`📍 ${ev.lugar}`);
+      if (ev.ciudad) metaParts.push(ev.ciudad);
+      if (ev.organizado_por) metaParts.push(`Organiza: ${ev.organizado_por}`);
+      $('#detalleMeta').textContent = metaParts.join('  ·  ') || 'Sin información adicional';
+      $('#detalleObs').textContent = ev.observaciones ? `Observaciones: ${ev.observaciones}` : '';
+    }
+
+    if (!cambioAsistentes) return;
+
+    state.asistentesCache = nuevosAsistentes;
+    if ($('#buscarAsistente').value.trim()) {
+      filtrarAsistentes();
+    } else {
+      renderAsistentes(state.asistentesCache);
+    }
   }
 
   function renderAsistentes(lista) {

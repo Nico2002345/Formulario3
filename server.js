@@ -173,6 +173,27 @@ const GRUPOS_VALOR = [
   'No aplica'
 ];
 
+const FORMULARIOS = {
+  direccionamiento: {
+    label: 'Direccionamiento Estratégico y Articulación Regional',
+    proceso: 'Direccionamiento Estratégico y Articulación Regional',
+    formato: 'Lista de asistencia ',
+    codigo: 'ES-DE-PR002-16-4.2',
+    version: 3
+  },
+  asistencia_territorial: {
+    label: 'Asistencia territorial y desarrollo institucional',
+    proceso: 'Asistencia territorial y desarrollo institucional',
+    formato: 'Lista de asistencia ',
+    codigo: 'MI-AT-FO002-1-2',
+    version: 2
+  }
+};
+
+app.get('/api/formularios', (req, res) => {
+  res.json(Object.entries(FORMULARIOS).map(([value, f]) => ({ value, label: f.label })));
+});
+
 const ETAREO_COLS = ['H', 'I', 'J', 'K', 'L'];
 const VALOR_COLS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'];
 const THIN_BORDER = { style: 'thin' };
@@ -218,17 +239,19 @@ function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
   ws.addImage(colombiaImageId, { tl: { col: 19.2, row: 0.05 }, ext: { width: 65, height: 62 } });
   ws.addImage(vaupesImageId, { tl: { col: 1.4, row: 0.05 }, ext: { width: 55, height: 66 } });
 
+  const formulario = FORMULARIOS[evento.tipo_formulario] || FORMULARIOS.direccionamiento;
+
   ws.mergeCells('D2:G2'); ws.mergeCells('H2:L2'); ws.mergeCells('M2:O2');
   ws.getCell('C2').value = 'Proceso:';
-  ws.getCell('D2').value = 'Direccionamiento Estratégico y Articulación Regional';
+  ws.getCell('D2').value = formulario.proceso;
   ws.getCell('H2').value = 'Código';
   ws.getCell('M2').value = 'Versión';
 
   ws.mergeCells('D3:G3'); ws.mergeCells('H3:L3'); ws.mergeCells('M3:O3');
   ws.getCell('C3').value = 'Formato:';
-  ws.getCell('D3').value = 'Lista de asistencia ';
-  ws.getCell('H3').value = 'ES-DE-PR002-16-4.2';
-  ws.getCell('M3').value = 3;
+  ws.getCell('D3').value = formulario.formato;
+  ws.getCell('H3').value = formulario.codigo;
+  ws.getCell('M3').value = formulario.version;
 
   [
     ['C2', 10, true], ['D2', 10, false], ['H2', 10, true], ['M2', 10, true],

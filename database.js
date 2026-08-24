@@ -76,6 +76,7 @@ async function init() {
       observaciones TEXT,
       token TEXT,
       registro_abierto INTEGER DEFAULT 1,
+      tipo_formulario TEXT DEFAULT 'direccionamiento',
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
     );
@@ -109,6 +110,9 @@ function migrateSchema() {
   if (!cols.includes('registro_abierto')) {
     db.run('ALTER TABLE eventos ADD COLUMN registro_abierto INTEGER DEFAULT 1');
   }
+  if (!cols.includes('tipo_formulario')) {
+    db.run("ALTER TABLE eventos ADD COLUMN tipo_formulario TEXT DEFAULT 'direccionamiento'");
+  }
   const sinToken = queryAll('SELECT id FROM eventos WHERE token IS NULL OR token = ?', ['']);
   sinToken.forEach(row => {
     runNoSave('UPDATE eventos SET token = ? WHERE id = ?', [crypto.randomBytes(8).toString('hex'), row.id]);
@@ -120,8 +124,8 @@ function migrateSchema() {
 function createEvento(data) {
   const token = crypto.randomBytes(8).toString('hex');
   return run(
-    `INSERT INTO eventos (tema_evento, organizado_por, ciudad, lugar, fecha, hora_inicio, hora_final, observaciones, token, registro_abierto)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+    `INSERT INTO eventos (tema_evento, organizado_por, ciudad, lugar, fecha, hora_inicio, hora_final, observaciones, token, registro_abierto, tipo_formulario)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     [
       data.tema_evento || '',
       data.organizado_por || '',
@@ -131,7 +135,8 @@ function createEvento(data) {
       data.hora_inicio || '',
       data.hora_final || '',
       data.observaciones || '',
-      token
+      token,
+      data.tipo_formulario || 'direccionamiento'
     ]
   );
 }
@@ -146,7 +151,7 @@ function getEventoByToken(token) {
 
 function updateEvento(id, data) {
   run(
-    `UPDATE eventos SET tema_evento=?, organizado_por=?, ciudad=?, lugar=?, fecha=?, hora_inicio=?, hora_final=?, observaciones=?, updated_at=datetime('now','localtime')
+    `UPDATE eventos SET tema_evento=?, organizado_por=?, ciudad=?, lugar=?, fecha=?, hora_inicio=?, hora_final=?, observaciones=?, tipo_formulario=?, updated_at=datetime('now','localtime')
      WHERE id=?`,
     [
       data.tema_evento || '',
@@ -157,6 +162,7 @@ function updateEvento(id, data) {
       data.hora_inicio || '',
       data.hora_final || '',
       data.observaciones || '',
+      data.tipo_formulario || 'direccionamiento',
       id
     ]
   );

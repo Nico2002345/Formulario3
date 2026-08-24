@@ -18,3 +18,8 @@ window.GRUPOS_ETAREOS = [
   { value: 'Adulto 29-59 años', label: 'Adulto (29-59 años)' },
   { value: 'Adulto mayor 60 años', label: 'Adulto mayor (60 años o más)' }
 ];
+
+window.FORMULARIOS = [
+  { value: 'direccionamiento', label: 'Direccionamiento Estratégico y Articulación Regional · ES-DE-PR002-16-4.2 v3', shortLabel: 'ES-DE-PR002-16-4.2 v3' },
+  { value: 'asistencia_territorial', label: 'Asistencia territorial y desarrollo institucional · MI-AT-FO002-1-2 v2', shortLabel: 'MI-AT-FO002-1-2 v2' }
+];

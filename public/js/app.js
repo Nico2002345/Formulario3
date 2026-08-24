@@ -93,9 +93,12 @@
               <div><i class="bi bi-geo-alt"></i> ${escapeHtml(ev.lugar) || 'Sin lugar'} ${ev.ciudad ? '· ' + escapeHtml(ev.ciudad) : ''}</div>
               <div><i class="bi bi-person-badge"></i> ${escapeHtml(ev.organizado_por) || 'Sin organizador'}</div>
             </div>
-            <div class="mb-2">
+            <div class="mb-2 d-flex flex-wrap gap-1">
               <span class="badge ${ev.registro_abierto ? 'text-bg-success' : 'text-bg-secondary'}">
                 <i class="bi bi-qr-code"></i> Registro ${ev.registro_abierto ? 'abierto' : 'cerrado'}
+              </span>
+              <span class="badge text-bg-light border" title="${escapeHtml(formularioLabel(ev.tipo_formulario))}">
+                <i class="bi bi-file-earmark-text"></i> ${escapeHtml(formularioShortLabel(ev.tipo_formulario))}
               </span>
             </div>
             <div class="mt-auto d-flex gap-2">
@@ -121,6 +124,7 @@
     form.reset();
     $('#eventoId').value = '';
     $('#modalEventoTitulo').textContent = 'Nuevo evento';
+    $('#tipo_formulario').value = FORMULARIOS[0].value;
 
     if (id) {
       const ev = await api(`/api/eventos/${id}`);
@@ -134,6 +138,7 @@
       $('#hora_inicio').value = ev.hora_inicio || '';
       $('#hora_final').value = ev.hora_final || '';
       $('#observaciones').value = ev.observaciones || '';
+      $('#tipo_formulario').value = ev.tipo_formulario || FORMULARIOS[0].value;
     }
 
     new bootstrap.Modal($('#modalEvento')).show();
@@ -150,7 +155,8 @@
       fecha: $('#fecha').value,
       hora_inicio: $('#hora_inicio').value,
       hora_final: $('#hora_final').value,
-      observaciones: $('#observaciones').value.trim()
+      observaciones: $('#observaciones').value.trim(),
+      tipo_formulario: $('#tipo_formulario').value
     };
 
     try {
@@ -320,6 +326,26 @@
     });
   }
 
+  function renderFormularioOptions() {
+    const sel = $('#tipo_formulario');
+    FORMULARIOS.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.value;
+      opt.textContent = f.label;
+      sel.appendChild(opt);
+    });
+  }
+
+  function formularioLabel(value) {
+    const f = FORMULARIOS.find(x => x.value === value);
+    return f ? f.label : FORMULARIOS[0].label;
+  }
+
+  function formularioShortLabel(value) {
+    const f = FORMULARIOS.find(x => x.value === value);
+    return f ? f.shortLabel : FORMULARIOS[0].shortLabel;
+  }
+
   async function abrirModalAsistente(id) {
     const form = $('#formAsistente');
     form.reset();
@@ -443,6 +469,7 @@
     firmaPad = createSignaturePad($('#firmaCanvas'));
     $('#btnLimpiarFirma').addEventListener('click', () => firmaPad.clear());
     renderGrupoEtareoOptions();
+    renderFormularioOptions();
 
     $('#btnNuevoEvento').addEventListener('click', () => abrirModalEvento(null));
     $('#formEvento').addEventListener('submit', guardarEvento);

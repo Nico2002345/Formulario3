@@ -279,6 +279,31 @@
   </div>
 </div>
 
+<!-- MODAL: EXPORTAR A EXCEL -->
+<div class="modal fade" id="modalExportar" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-excel"></i> Exportar a Excel</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Selecciona los eventos que quieres incluir en el archivo Excel.</p>
+        <div class="form-check mb-2 border-bottom pb-2">
+          <input class="form-check-input" type="checkbox" id="exportarSeleccionarTodos" checked>
+          <label class="form-check-label fw-semibold" for="exportarSeleccionarTodos">Seleccionar todos</label>
+        </div>
+        <div id="exportarEventosContainer"></div>
+        <p id="exportarVacio" class="text-muted text-center py-3 d-none">No hay eventos registrados.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-success" id="btnConfirmarExportar"><i class="bi bi-download"></i> Exportar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="toast-container position-fixed bottom-0 end-0 p-3">
   <div id="appToast" class="toast align-items-center text-bg-dark border-0" role="alert">
     <div class="d-flex">

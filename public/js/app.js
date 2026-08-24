@@ -389,8 +389,50 @@
 
   // ---------- Exportar ----------
 
-  function exportarExcel() {
-    window.location.href = '/api/export/excel';
+  async function abrirModalExportar() {
+    const eventos = state.eventosCache.length ? state.eventosCache : await api('/api/eventos');
+    const cont = $('#exportarEventosContainer');
+    cont.innerHTML = '';
+    $('#exportarVacio').classList.toggle('d-none', eventos.length > 0);
+    $('#exportarSeleccionarTodos').checked = true;
+    $('#exportarSeleccionarTodos').disabled = eventos.length === 0;
+
+    eventos.forEach(ev => {
+      const div = document.createElement('div');
+      div.className = 'form-check';
+      div.innerHTML = `
+        <input class="form-check-input exportar-evento-check" type="checkbox" value="${ev.id}" id="exportar_ev_${ev.id}" checked>
+        <label class="form-check-label" for="exportar_ev_${ev.id}">
+          ${escapeHtml(ev.tema_evento)}
+          <span class="text-muted small">${ev.fecha ? '· ' + escapeHtml(ev.fecha) : ''}</span>
+        </label>
+      `;
+      cont.appendChild(div);
+    });
+
+    cont.querySelectorAll('.exportar-evento-check').forEach(chk => {
+      chk.addEventListener('change', () => {
+        const todos = cont.querySelectorAll('.exportar-evento-check');
+        const marcados = cont.querySelectorAll('.exportar-evento-check:checked');
+        $('#exportarSeleccionarTodos').checked = todos.length === marcados.length;
+      });
+    });
+
+    new bootstrap.Modal($('#modalExportar')).show();
+  }
+
+  function toggleSeleccionarTodosExportar(e) {
+    $$('.exportar-evento-check').forEach(chk => { chk.checked = e.target.checked; });
+  }
+
+  function confirmarExportar() {
+    const ids = Array.from($$('.exportar-evento-check:checked')).map(c => c.value);
+    if (ids.length === 0) {
+      toast('Selecciona al menos un evento');
+      return;
+    }
+    window.location.href = `/api/export/excel?ids=${ids.join(',')}`;
+    bootstrap.Modal.getInstance($('#modalExportar')).hide();
   }
 
   // ---------- Init ----------
@@ -405,7 +447,9 @@
     $('#btnNuevoEvento').addEventListener('click', () => abrirModalEvento(null));
     $('#formEvento').addEventListener('submit', guardarEvento);
     $('#buscarEvento').addEventListener('input', debounce(cargarEventos, 300));
-    $('#btnExportExcel').addEventListener('click', exportarExcel);
+    $('#btnExportExcel').addEventListener('click', abrirModalExportar);
+    $('#exportarSeleccionarTodos').addEventListener('change', toggleSeleccionarTodosExportar);
+    $('#btnConfirmarExportar').addEventListener('click', confirmarExportar);
 
     $('#btnVolver').addEventListener('click', mostrarVistaEventos);
     $('#btnEditarEvento').addEventListener('click', () => abrirModalEvento(state.eventoActualId));

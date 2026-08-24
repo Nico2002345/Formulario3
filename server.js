@@ -360,7 +360,13 @@ function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
 
 app.get('/api/export/excel', async (req, res) => {
   try {
-    const eventos = db.getEventos('');
+    let eventos = db.getEventos('');
+    if (req.query.ids) {
+      const idsSeleccionados = new Set(
+        String(req.query.ids).split(',').map(id => Number(id)).filter(id => !Number.isNaN(id))
+      );
+      eventos = eventos.filter(ev => idsSeleccionados.has(ev.id));
+    }
     const workbook = new ExcelJS.Workbook();
     const colombiaImageId = workbook.addImage({
       filename: path.join(__dirname, 'public', 'assets', 'excel', 'colombia.png'),

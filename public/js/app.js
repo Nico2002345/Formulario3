@@ -51,6 +51,12 @@
       .replace(/"/g, '&quot;');
   }
 
+  function formatFecha(iso) {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
+  }
+
   function linkRegistro(token) {
     return `${window.location.origin}/r/${token}`;
   }
@@ -113,7 +119,7 @@
               <span class="badge text-bg-primary badge-count">${ev.total_asistentes} asist.</span>
             </div>
             <div class="text-muted small mb-2">
-              <div><i class="bi bi-calendar3"></i> ${escapeHtml(ev.fecha) || 'Sin fecha'} ${ev.hora_inicio ? '· ' + escapeHtml(ev.hora_inicio) : ''}</div>
+              <div><i class="bi bi-calendar3"></i> ${escapeHtml(formatFecha(ev.fecha)) || 'Sin fecha'} ${ev.hora_inicio ? '· ' + escapeHtml(ev.hora_inicio) : ''}</div>
               <div><i class="bi bi-geo-alt"></i> ${escapeHtml(ev.lugar) || 'Sin lugar'} ${ev.ciudad ? '· ' + escapeHtml(ev.ciudad) : ''}</div>
               <div><i class="bi bi-person-badge"></i> ${escapeHtml(ev.organizado_por) || 'Sin organizador'}</div>
             </div>
@@ -280,7 +286,7 @@
     if (!silencioso) {
       $('#detalleTema').textContent = ev.tema_evento;
       const metaParts = [];
-      if (ev.fecha) metaParts.push(`📅 ${ev.fecha}`);
+      if (ev.fecha) metaParts.push(`📅 ${formatFecha(ev.fecha)}`);
       if (ev.hora_inicio || ev.hora_final) metaParts.push(`🕐 ${ev.hora_inicio || '?'} - ${ev.hora_final || '?'}`);
       if (ev.lugar) metaParts.push(`📍 ${ev.lugar}`);
       if (ev.ciudad) metaParts.push(ev.ciudad);
@@ -474,7 +480,7 @@
         <input class="form-check-input exportar-evento-check" type="checkbox" value="${ev.id}" id="exportar_ev_${ev.id}" checked>
         <label class="form-check-label" for="exportar_ev_${ev.id}">
           ${escapeHtml(ev.tema_evento)}
-          <span class="text-muted small">${ev.fecha ? '· ' + escapeHtml(ev.fecha) : ''}</span>
+          <span class="text-muted small">${ev.fecha ? '· ' + escapeHtml(formatFecha(ev.fecha)) : ''}</span>
         </label>
       `;
       cont.appendChild(div);

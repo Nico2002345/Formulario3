@@ -194,6 +194,12 @@ app.get('/api/formularios', (req, res) => {
   res.json(Object.entries(FORMULARIOS).map(([value, f]) => ({ value, label: f.label })));
 });
 
+function formatFecha(iso) {
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
+}
+
 const ETAREO_COLS = ['H', 'I', 'J', 'K', 'L'];
 const VALOR_COLS = ['M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V'];
 const THIN_BORDER = { style: 'thin' };
@@ -270,7 +276,7 @@ function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
   ws.getCell('E5').value = `LUGAR: ${evento.lugar || ''}`;
 
   ws.mergeCells('A6:C6'); ws.mergeCells('D6:E6'); ws.mergeCells('F6:W6');
-  ws.getCell('A6').value = `FECHA: ${evento.fecha || ''}`;
+  ws.getCell('A6').value = `FECHA: ${formatFecha(evento.fecha)}`;
   ws.getCell('D6').value = `HORA INICIO: ${evento.hora_inicio || ''}`;
   ws.getCell('F6').value = `HORA FINAL: ${evento.hora_final || ''}`;
 

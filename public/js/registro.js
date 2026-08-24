@@ -4,6 +4,12 @@
   const $ = sel => document.querySelector(sel);
   const $$ = sel => document.querySelectorAll(sel);
 
+  function formatFecha(iso) {
+    if (!iso) return '';
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
+  }
+
   const token = window.location.pathname.split('/').filter(Boolean).pop();
   let firmaPad;
 
@@ -72,7 +78,7 @@
 
       $('#eventoTema').textContent = evento.tema_evento;
       const metaParts = [];
-      if (evento.fecha) metaParts.push(`📅 ${evento.fecha}`);
+      if (evento.fecha) metaParts.push(`📅 ${formatFecha(evento.fecha)}`);
       if (evento.hora_inicio || evento.hora_final) metaParts.push(`🕐 ${evento.hora_inicio || '?'} - ${evento.hora_final || '?'}`);
       if (evento.lugar) metaParts.push(`📍 ${evento.lugar}`);
       if (evento.ciudad) metaParts.push(evento.ciudad);

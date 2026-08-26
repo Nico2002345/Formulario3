@@ -140,6 +140,65 @@
 
   // ---------- Eventos ----------
 
+  function renderEventoCard(ev) {
+    const col = document.createElement('div');
+    col.className = 'col-12 col-md-6 col-xl-4';
+    col.innerHTML = `
+      <div class="card evento-card">
+        <div class="card-body d-flex flex-column">
+          <div class="d-flex justify-content-between align-items-start">
+            <h3 class="card-title h6 mb-2">${escapeHtml(ev.tema_evento)}</h3>
+            <span class="badge text-bg-primary badge-count">${ev.total_asistentes} asist.</span>
+          </div>
+          <div class="text-muted small mb-2">
+            <div><i class="bi bi-calendar3"></i> ${escapeHtml(formatFecha(ev.fecha)) || 'Sin fecha'} ${ev.hora_inicio ? '· ' + escapeHtml(ev.hora_inicio) : ''}</div>
+            <div><i class="bi bi-geo-alt"></i> ${escapeHtml(ev.lugar) || 'Sin lugar'} ${ev.ciudad ? '· ' + escapeHtml(ev.ciudad) : ''}</div>
+            <div><i class="bi bi-person-badge"></i> ${escapeHtml(ev.organizado_por) || 'Sin organizador'}</div>
+          </div>
+          <div class="mb-2 d-flex flex-wrap gap-1">
+            <span class="badge ${ev.registro_abierto ? 'text-bg-success' : 'text-bg-secondary'}">
+              <i class="bi bi-qr-code"></i> Registro ${ev.registro_abierto ? 'abierto' : 'cerrado'}
+            </span>
+            <span class="badge text-bg-light border" title="${escapeHtml(formularioLabel(ev.tipo_formulario))}">
+              <i class="bi bi-file-earmark-text"></i> ${escapeHtml(formularioShortLabel(ev.tipo_formulario))}
+            </span>
+          </div>
+          <div class="mt-auto d-flex gap-2">
+            <button class="btn btn-sm btn-primary flex-fill" data-ver="${ev.id}"><i class="bi bi-people"></i> Asistentes</button>
+            <button class="btn btn-sm btn-outline-primary" data-compartir="${ev.id}" title="Compartir link de registro"><i class="bi bi-share"></i></button>
+            <button class="btn btn-sm btn-outline-secondary" data-editar="${ev.id}"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger" data-eliminar="${ev.id}"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+      </div>
+    `;
+    return col;
+  }
+
+  function bindEventoCardHandlers(cont) {
+    cont.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => mostrarVistaDetalle(Number(b.dataset.ver))));
+    cont.querySelectorAll('[data-compartir]').forEach(b => b.addEventListener('click', () => abrirModalCompartir(Number(b.dataset.compartir))));
+    cont.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', () => abrirModalEvento(Number(b.dataset.editar))));
+    cont.querySelectorAll('[data-eliminar]').forEach(b => b.addEventListener('click', () => eliminarEvento(Number(b.dataset.eliminar))));
+  }
+
+  function renderGrupoEventos(cont, nombre, eventos) {
+    const header = document.createElement('div');
+    header.className = 'col-12';
+    header.innerHTML = `<h3 class="h6 text-muted border-bottom pb-1 mb-2 mt-2"><i class="bi bi-building"></i> ${escapeHtml(nombre)} <span class="badge text-bg-light border">${eventos.length}</span></h3>`;
+    cont.appendChild(header);
+
+    if (eventos.length === 0) {
+      const vacio = document.createElement('p');
+      vacio.className = 'col-12 text-muted small ps-2';
+      vacio.textContent = 'Sin eventos.';
+      cont.appendChild(vacio);
+      return;
+    }
+
+    eventos.forEach(ev => cont.appendChild(renderEventoCard(ev)));
+  }
+
   async function cargarEventos() {
     const search = $('#buscarEvento').value;
     const eventos = await api(`/api/eventos?search=${encodeURIComponent(search)}`);
@@ -148,45 +207,27 @@
     cont.innerHTML = '';
     $('#eventosVacio').classList.toggle('d-none', eventos.length > 0);
 
-    eventos.forEach(ev => {
-      const col = document.createElement('div');
-      col.className = 'col-12 col-md-6 col-xl-4';
-      col.innerHTML = `
-        <div class="card evento-card">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex justify-content-between align-items-start">
-              <h3 class="card-title h6 mb-2">${escapeHtml(ev.tema_evento)}</h3>
-              <span class="badge text-bg-primary badge-count">${ev.total_asistentes} asist.</span>
-            </div>
-            <div class="text-muted small mb-2">
-              <div><i class="bi bi-calendar3"></i> ${escapeHtml(formatFecha(ev.fecha)) || 'Sin fecha'} ${ev.hora_inicio ? '· ' + escapeHtml(ev.hora_inicio) : ''}</div>
-              <div><i class="bi bi-geo-alt"></i> ${escapeHtml(ev.lugar) || 'Sin lugar'} ${ev.ciudad ? '· ' + escapeHtml(ev.ciudad) : ''}</div>
-              <div><i class="bi bi-person-badge"></i> ${escapeHtml(ev.organizado_por) || 'Sin organizador'}</div>
-            </div>
-            <div class="mb-2 d-flex flex-wrap gap-1">
-              <span class="badge ${ev.registro_abierto ? 'text-bg-success' : 'text-bg-secondary'}">
-                <i class="bi bi-qr-code"></i> Registro ${ev.registro_abierto ? 'abierto' : 'cerrado'}
-              </span>
-              <span class="badge text-bg-light border" title="${escapeHtml(formularioLabel(ev.tipo_formulario))}">
-                <i class="bi bi-file-earmark-text"></i> ${escapeHtml(formularioShortLabel(ev.tipo_formulario))}
-              </span>
-            </div>
-            <div class="mt-auto d-flex gap-2">
-              <button class="btn btn-sm btn-primary flex-fill" data-ver="${ev.id}"><i class="bi bi-people"></i> Asistentes</button>
-              <button class="btn btn-sm btn-outline-primary" data-compartir="${ev.id}" title="Compartir link de registro"><i class="bi bi-share"></i></button>
-              <button class="btn btn-sm btn-outline-secondary" data-editar="${ev.id}"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-sm btn-outline-danger" data-eliminar="${ev.id}"><i class="bi bi-trash"></i></button>
-            </div>
-          </div>
-        </div>
-      `;
-      cont.appendChild(col);
-    });
+    if (state.sesion.modo === 'maestro' && eventos.length > 0) {
+      const departamentos = await api('/api/departamentos');
+      const porDepto = new Map(departamentos.map(d => [d.id, []]));
+      const sinAsignar = [];
+      eventos.forEach(ev => {
+        if (ev.departamento_id && porDepto.has(ev.departamento_id)) {
+          porDepto.get(ev.departamento_id).push(ev);
+        } else {
+          sinAsignar.push(ev);
+        }
+      });
+      departamentos.filter(d => porDepto.get(d.id).length > 0)
+        .forEach(d => renderGrupoEventos(cont, d.nombre, porDepto.get(d.id)));
+      if (sinAsignar.length) {
+        renderGrupoEventos(cont, 'Sin asignar', sinAsignar);
+      }
+    } else {
+      eventos.forEach(ev => cont.appendChild(renderEventoCard(ev)));
+    }
 
-    cont.querySelectorAll('[data-ver]').forEach(b => b.addEventListener('click', () => mostrarVistaDetalle(Number(b.dataset.ver))));
-    cont.querySelectorAll('[data-compartir]').forEach(b => b.addEventListener('click', () => abrirModalCompartir(Number(b.dataset.compartir))));
-    cont.querySelectorAll('[data-editar]').forEach(b => b.addEventListener('click', () => abrirModalEvento(Number(b.dataset.editar))));
-    cont.querySelectorAll('[data-eliminar]').forEach(b => b.addEventListener('click', () => eliminarEvento(Number(b.dataset.eliminar))));
+    bindEventoCardHandlers(cont);
   }
 
   async function poblarDepartamentoOptions(seleccionado) {

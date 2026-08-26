@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const ExcelJS = require('exceljs');
 const db = require('./database');
 
@@ -14,6 +15,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 const DEPT_COOKIE = 'dept_token';
 const DEPT_COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 365 * 24 * 60 * 60 * 1000 };
 
+const ADMIN_COOKIE = 'admin_token';
+const ADMIN_COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 365 * 24 * 60 * 60 * 1000 };
+
 function getCookie(req, name) {
   const header = req.headers.cookie;
   if (!header) return null;
@@ -25,18 +29,36 @@ function getCookie(req, name) {
   return null;
 }
 
+function getAdminSessionToken() {
+  const secret = process.env.ADMIN_PASSWORD;
+  if (!secret) return null;
+  return crypto.createHmac('sha256', secret).update('admin-session').digest('hex');
+}
+
+function esAdminValido(req) {
+  const expected = getAdminSessionToken();
+  if (!expected) return true; // sin ADMIN_PASSWORD configurado, no se exige login (comportamiento anterior)
+  const cookie = getCookie(req, ADMIN_COOKIE);
+  if (!cookie || cookie.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(expected));
+}
+
 function resolveContexto(req) {
   const token = getCookie(req, DEPT_COOKIE);
-  if (!token) return { modo: 'maestro' };
-  const depto = db.getDepartamentoByToken(token);
-  if (!depto) return { modo: 'invalido' };
-  return { modo: 'departamento', depto };
+  if (token) {
+    const depto = db.getDepartamentoByToken(token);
+    return depto ? { modo: 'departamento', depto } : { modo: 'invalido' };
+  }
+  return esAdminValido(req) ? { modo: 'maestro' } : { modo: 'sin_autenticar' };
 }
 
 function requireContexto(req, res, next) {
   const ctx = resolveContexto(req);
   if (ctx.modo === 'invalido') {
     return res.status(403).json({ error: 'Link no válido, contacta al administrador' });
+  }
+  if (ctx.modo === 'sin_autenticar') {
+    return res.status(401).json({ error: 'Debes iniciar sesión como administrador' });
   }
   req.ctx = ctx;
   next();
@@ -56,6 +78,25 @@ app.get('/api/sesion', (req, res) => {
     return res.json({ modo: 'departamento', departamento: { id: ctx.depto.id, nombre: ctx.depto.nombre } });
   }
   res.json({ modo: ctx.modo });
+});
+
+app.post('/api/admin-login', (req, res) => {
+  const secret = process.env.ADMIN_PASSWORD;
+  if (!secret) return res.status(400).json({ error: 'No hay contraseña de administrador configurada en el servidor' });
+  if (req.body.password !== secret) {
+    return res.status(401).json({ error: 'Contraseña incorrecta' });
+  }
+  res.cookie(ADMIN_COOKIE, getAdminSessionToken(), ADMIN_COOKIE_OPTS);
+  res.json({ ok: true });
+});
+
+app.get('/admin-logout', (req, res) => {
+  res.clearCookie(ADMIN_COOKIE);
+  res.redirect('/admin-login');
+});
+
+app.get('/admin-login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
 app.get('/admin/salir', (req, res) => {

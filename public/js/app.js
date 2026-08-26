@@ -72,6 +72,11 @@
     const sesion = await api('/api/sesion');
     state.sesion = sesion;
 
+    if (sesion.modo === 'sin_autenticar') {
+      window.location.href = '/admin-login';
+      return false;
+    }
+
     if (sesion.modo === 'invalido') {
       $('#appMain').classList.add('d-none');
       $('#sesionInvalida').classList.remove('d-none');
@@ -81,11 +86,13 @@
     if (sesion.modo === 'departamento') {
       $('#headerSubtitle').textContent = `Departamento: ${sesion.departamento.nombre}`;
       $('#btnDepartamentos').classList.add('d-none');
+      $('#btnCerrarSesionAdmin').classList.add('d-none');
       $('#departamentoField').classList.add('d-none');
       $('#linkSalirDepartamento').classList.remove('d-none');
     } else {
       $('#headerSubtitle').textContent = 'Vista general · Todos los departamentos';
       $('#btnDepartamentos').classList.remove('d-none');
+      $('#btnCerrarSesionAdmin').classList.remove('d-none');
       $('#departamentoField').classList.remove('d-none');
       $('#linkSalirDepartamento').classList.add('d-none');
     }

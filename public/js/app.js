@@ -82,10 +82,12 @@
       $('#headerSubtitle').textContent = `Departamento: ${sesion.departamento.nombre}`;
       $('#btnDepartamentos').classList.add('d-none');
       $('#departamentoField').classList.add('d-none');
+      $('#linkSalirDepartamento').classList.remove('d-none');
     } else {
       $('#headerSubtitle').textContent = 'Vista general · Todos los departamentos';
       $('#btnDepartamentos').classList.remove('d-none');
       $('#departamentoField').classList.remove('d-none');
+      $('#linkSalirDepartamento').classList.add('d-none');
     }
     return true;
   }

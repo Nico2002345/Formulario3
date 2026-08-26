@@ -117,7 +117,7 @@ app.get('/admin/:token', (req, res) => {
   const depto = db.getDepartamentoByToken(req.params.token);
   if (!depto) return res.status(404).send('Link no válido. Contacta al administrador para obtener un nuevo link.');
   res.cookie(DEPT_COOKIE, req.params.token, DEPT_COOKIE_OPTS);
-  res.redirect('/');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 // ---------- DEPARTAMENTOS ----------

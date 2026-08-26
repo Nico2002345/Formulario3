@@ -84,11 +84,13 @@
     }
 
     if (sesion.modo === 'departamento') {
+      document.title = `${sesion.departamento.nombre} · Lista de Asistencia`;
       $('#headerSubtitle').textContent = `Departamento: ${sesion.departamento.nombre}`;
       $('#btnDepartamentos').classList.add('d-none');
       $('#btnCerrarSesionAdmin').classList.add('d-none');
       $('#departamentoField').classList.add('d-none');
     } else {
+      document.title = 'Admin · Lista de Asistencia';
       $('#headerSubtitle').textContent = 'Vista general · Todos los departamentos';
       $('#btnDepartamentos').classList.remove('d-none');
       $('#btnCerrarSesionAdmin').classList.remove('d-none');

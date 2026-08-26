@@ -8,6 +8,15 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json({ limit: '5mb' }));
+
+// La URL raíz siempre es la vista de administrador: entrar aquí borra
+// cualquier cookie vieja de un link de departamento, sin importar qué
+// hubiera antes en el navegador.
+app.get('/', (req, res) => {
+  res.clearCookie(DEPT_COOKIE);
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- ACCESO POR DEPARTAMENTO ----------

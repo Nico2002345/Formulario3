@@ -63,7 +63,7 @@
   }
 
   function linkDepartamento(token) {
-    return `${window.location.origin}/admin/${token}`;
+    return `${window.location.origin}/dpto/${token}`;
   }
 
   // ---------- Sesión / Departamento ----------

@@ -108,17 +108,21 @@ app.get('/admin-login', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin-login.html'));
 });
 
-app.get('/admin/salir', (req, res) => {
+app.get('/dpto/salir', (req, res) => {
   res.clearCookie(DEPT_COOKIE);
   res.redirect('/');
 });
 
-app.get('/admin/:token', (req, res) => {
+app.get('/dpto/:token', (req, res) => {
   const depto = db.getDepartamentoByToken(req.params.token);
   if (!depto) return res.status(404).send('Link no válido. Contacta al administrador para obtener un nuevo link.');
   res.cookie(DEPT_COOKIE, req.params.token, DEPT_COOKIE_OPTS);
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// Compatibilidad con links /admin/:token repartidos antes de este cambio
+app.get('/admin/salir', (req, res) => res.redirect('/dpto/salir'));
+app.get('/admin/:token', (req, res) => res.redirect(`/dpto/${req.params.token}`));
 
 // ---------- DEPARTAMENTOS ----------
 

@@ -35,24 +35,19 @@ function getAdminSessionToken() {
   return crypto.createHmac('sha256', secret).update('admin-session').digest('hex');
 }
 
-function tieneSesionAdminValida(req) {
+function esAdminValido(req) {
   const expected = getAdminSessionToken();
-  if (!expected) return false; // sin ADMIN_PASSWORD configurado no existe "sesión admin" real
+  if (!expected) return true; // sin ADMIN_PASSWORD configurado, no se exige login (comportamiento anterior)
   const cookie = getCookie(req, ADMIN_COOKIE);
   if (!cookie || cookie.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(expected));
 }
 
-function esAdminValido(req) {
-  if (!process.env.ADMIN_PASSWORD) return true; // sin ADMIN_PASSWORD configurado, no se exige login (comportamiento anterior)
-  return tieneSesionAdminValida(req);
-}
-
 function resolveContexto(req) {
-  // Una sesión de admin ya autenticada con contraseña siempre gana, aunque el
-  // navegador tenga guardada una cookie vieja de algún link de departamento.
-  if (tieneSesionAdminValida(req)) return { modo: 'maestro' };
-
+  // Cada login (departamento o admin) borra la cookie del otro al iniciar
+  // sesión, así que en un momento dado solo una de las dos debería existir.
+  // Si igual quedaran ambas (cookies de antes de este cambio), gana la del
+  // departamento porque fue la acción más reciente del usuario.
   const token = getCookie(req, DEPT_COOKIE);
   if (token) {
     const depto = db.getDepartamentoByToken(token);
@@ -95,12 +90,14 @@ app.post('/api/admin-login', (req, res) => {
   if (req.body.password !== secret) {
     return res.status(401).json({ error: 'Contraseña incorrecta' });
   }
+  res.clearCookie(DEPT_COOKIE);
   res.cookie(ADMIN_COOKIE, getAdminSessionToken(), ADMIN_COOKIE_OPTS);
   res.json({ ok: true });
 });
 
 app.get('/admin-logout', (req, res) => {
   res.clearCookie(ADMIN_COOKIE);
+  res.clearCookie(DEPT_COOKIE);
   res.redirect('/admin-login');
 });
 
@@ -110,12 +107,14 @@ app.get('/admin-login', (req, res) => {
 
 app.get('/dpto/salir', (req, res) => {
   res.clearCookie(DEPT_COOKIE);
+  res.clearCookie(ADMIN_COOKIE);
   res.redirect('/');
 });
 
 app.get('/dpto/:token', (req, res) => {
   const depto = db.getDepartamentoByToken(req.params.token);
   if (!depto) return res.status(404).send('Link no válido. Contacta al administrador para obtener un nuevo link.');
+  res.clearCookie(ADMIN_COOKIE);
   res.cookie(DEPT_COOKIE, req.params.token, DEPT_COOKIE_OPTS);
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

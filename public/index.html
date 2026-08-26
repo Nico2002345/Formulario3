@@ -20,7 +20,7 @@
 
       <div class="header-title">
         <h1>Lista de Asistencia</h1>
-        <p class="text-muted mb-0">Departamento de Vaupés · Sistema de Listas de Asistencia</p>
+        <p class="text-muted mb-0" id="headerSubtitle">Departamento de Vaupés · Sistema de Listas de Asistencia</p>
       </div>
 
       <div class="logo-slot" id="logoRight">
@@ -30,13 +30,24 @@
   </div>
 </header>
 
-<main class="container-fluid py-4">
+<p id="sesionInvalida" class="text-center text-danger py-5 d-none">
+  <i class="bi bi-exclamation-triangle display-4 d-block mb-2"></i>
+  Este link ya no es válido. Contacta al administrador para obtener un nuevo link de acceso.
+</p>
+
+<main class="container-fluid py-4" id="appMain">
 
   <!-- VISTA: LISTA DE EVENTOS -->
   <section id="view-eventos">
     <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
       <h2 class="h4 mb-0"><i class="bi bi-calendar-event"></i> Eventos registrados</h2>
       <div class="d-flex flex-wrap gap-2">
+        <button class="btn btn-outline-secondary d-none" id="btnDepartamentos">
+          <i class="bi bi-building"></i> Departamentos
+        </button>
+        <button class="btn btn-outline-dark" id="btnPapelera">
+          <i class="bi bi-trash3"></i> Papelera
+        </button>
         <button class="btn btn-outline-success" id="btnExportExcel">
           <i class="bi bi-file-earmark-excel"></i> Exportar a Excel
         </button>
@@ -111,6 +122,20 @@
     <p id="asistentesVacio" class="text-muted text-center py-4 d-none">Aún no hay asistentes registrados en este evento.</p>
   </section>
 
+  <!-- VISTA: PAPELERA -->
+  <section id="view-papelera" class="d-none">
+    <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
+      <h2 class="h4 mb-0"><i class="bi bi-trash3"></i> Papelera</h2>
+      <button class="btn btn-link" id="btnVolverPapelera"><i class="bi bi-arrow-left"></i> Volver a eventos</button>
+    </div>
+    <p class="text-muted small">Los eventos eliminados quedan aquí. Puedes restaurarlos o borrarlos definitivamente.</p>
+    <div id="papeleraContainer" class="row g-3"></div>
+    <p id="papeleraVacio" class="text-muted text-center py-5 d-none">
+      <i class="bi bi-inbox display-4 d-block mb-2"></i>
+      La papelera está vacía.
+    </p>
+  </section>
+
 </main>
 
 <!-- MODAL: EVENTO -->
@@ -131,6 +156,12 @@
           <div class="mb-3">
             <label class="form-label">Formulario a usar</label>
             <select class="form-select" id="tipo_formulario"></select>
+          </div>
+          <div class="mb-3 d-none" id="departamentoField">
+            <label class="form-label">Departamento</label>
+            <select class="form-select" id="departamento_id">
+              <option value="">Sin asignar</option>
+            </select>
           </div>
           <div class="row g-3">
             <div class="col-md-6">
@@ -302,6 +333,30 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-success" id="btnConfirmarExportar"><i class="bi bi-download"></i> Exportar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: DEPARTAMENTOS -->
+<div class="modal fade" id="modalDepartamentos" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-building"></i> Departamentos</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small">Cada departamento tiene su propio link privado: solo ve y exporta sus propios eventos.</p>
+        <form id="formDepartamento" class="input-group mb-3">
+          <input type="text" class="form-control" id="nuevoDepartamentoNombre" placeholder="Nombre del nuevo departamento" required>
+          <button class="btn btn-primary" type="submit"><i class="bi bi-plus-circle"></i> Crear</button>
+        </form>
+        <div id="departamentosContainer"></div>
+        <p id="departamentosVacio" class="text-muted text-center py-3 d-none">Aún no hay departamentos creados.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
       </div>
     </div>
   </div>

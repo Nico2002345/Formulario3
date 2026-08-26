@@ -9,11 +9,110 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ---------- ACCESO POR DEPARTAMENTO ----------
+
+const DEPT_COOKIE = 'dept_token';
+const DEPT_COOKIE_OPTS = { httpOnly: true, sameSite: 'lax', maxAge: 365 * 24 * 60 * 60 * 1000 };
+
+function getCookie(req, name) {
+  const header = req.headers.cookie;
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const idx = part.indexOf('=');
+    if (idx === -1) continue;
+    if (part.slice(0, idx).trim() === name) return decodeURIComponent(part.slice(idx + 1).trim());
+  }
+  return null;
+}
+
+function resolveContexto(req) {
+  const token = getCookie(req, DEPT_COOKIE);
+  if (!token) return { modo: 'maestro' };
+  const depto = db.getDepartamentoByToken(token);
+  if (!depto) return { modo: 'invalido' };
+  return { modo: 'departamento', depto };
+}
+
+function requireContexto(req, res, next) {
+  const ctx = resolveContexto(req);
+  if (ctx.modo === 'invalido') {
+    return res.status(403).json({ error: 'Link no válido, contacta al administrador' });
+  }
+  req.ctx = ctx;
+  next();
+}
+
+function puedeAccederEvento(ctx, evento) {
+  if (!evento) return false;
+  if (ctx.modo === 'departamento') return evento.departamento_id === ctx.depto.id;
+  return true;
+}
+
+app.use(['/api/eventos', '/api/asistentes', '/api/departamentos', '/api/export'], requireContexto);
+
+app.get('/api/sesion', (req, res) => {
+  const ctx = resolveContexto(req);
+  if (ctx.modo === 'departamento') {
+    return res.json({ modo: 'departamento', departamento: { id: ctx.depto.id, nombre: ctx.depto.nombre } });
+  }
+  res.json({ modo: ctx.modo });
+});
+
+app.get('/admin/salir', (req, res) => {
+  res.clearCookie(DEPT_COOKIE);
+  res.redirect('/');
+});
+
+app.get('/admin/:token', (req, res) => {
+  const depto = db.getDepartamentoByToken(req.params.token);
+  if (!depto) return res.status(404).send('Link no válido. Contacta al administrador para obtener un nuevo link.');
+  res.cookie(DEPT_COOKIE, req.params.token, DEPT_COOKIE_OPTS);
+  res.redirect('/');
+});
+
+// ---------- DEPARTAMENTOS ----------
+
+app.get('/api/departamentos', (req, res) => {
+  try {
+    if (req.ctx.modo !== 'maestro') return res.status(403).json({ error: 'No autorizado' });
+    res.json(db.getDepartamentos());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/departamentos', (req, res) => {
+  try {
+    if (req.ctx.modo !== 'maestro') return res.status(403).json({ error: 'No autorizado' });
+    const nombre = (req.body.nombre || '').trim();
+    if (!nombre) return res.status(400).json({ error: 'El nombre es obligatorio' });
+    const id = db.createDepartamento(nombre);
+    res.status(201).json(db.getDepartamentos().find(d => d.id === id));
+  } catch (err) {
+    if (String(err.message).toUpperCase().includes('UNIQUE')) {
+      return res.status(400).json({ error: 'Ya existe un departamento con ese nombre' });
+    }
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/departamentos/:id', (req, res) => {
+  try {
+    if (req.ctx.modo !== 'maestro') return res.status(403).json({ error: 'No autorizado' });
+    db.deleteDepartamento(Number(req.params.id));
+    res.status(204).end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ---------- EVENTOS ----------
 
 app.get('/api/eventos', (req, res) => {
   try {
-    const eventos = db.getEventos(req.query.search || '');
+    const departamentoId = req.ctx.modo === 'departamento' ? req.ctx.depto.id : null;
+    const papelera = req.query.papelera === '1';
+    const eventos = db.getEventos(req.query.search || '', { departamentoId, papelera });
     res.json(eventos);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -23,7 +122,7 @@ app.get('/api/eventos', (req, res) => {
 app.get('/api/eventos/:id', (req, res) => {
   try {
     const evento = db.getEventoById(Number(req.params.id));
-    if (!evento) return res.status(404).json({ error: 'Evento no encontrado' });
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
     res.json(evento);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -35,7 +134,11 @@ app.post('/api/eventos', (req, res) => {
     if (!req.body.tema_evento || !req.body.tema_evento.trim()) {
       return res.status(400).json({ error: 'El tema o evento es obligatorio' });
     }
-    const id = db.createEvento(req.body);
+    const data = { ...req.body };
+    data.departamento_id = req.ctx.modo === 'departamento'
+      ? req.ctx.depto.id
+      : (req.body.departamento_id ? Number(req.body.departamento_id) : null);
+    const id = db.createEvento(data);
     res.status(201).json(db.getEventoById(id));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -47,7 +150,13 @@ app.put('/api/eventos/:id', (req, res) => {
     if (!req.body.tema_evento || !req.body.tema_evento.trim()) {
       return res.status(400).json({ error: 'El tema o evento es obligatorio' });
     }
-    db.updateEvento(Number(req.params.id), req.body);
+    const evento = db.getEventoById(Number(req.params.id));
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
+    const data = { ...req.body };
+    data.departamento_id = req.ctx.modo === 'departamento'
+      ? req.ctx.depto.id
+      : (req.body.departamento_id ? Number(req.body.departamento_id) : evento.departamento_id);
+    db.updateEvento(Number(req.params.id), data);
     res.json(db.getEventoById(Number(req.params.id)));
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -56,7 +165,31 @@ app.put('/api/eventos/:id', (req, res) => {
 
 app.delete('/api/eventos/:id', (req, res) => {
   try {
+    const evento = db.getEventoById(Number(req.params.id));
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
     db.deleteEvento(Number(req.params.id));
+    res.status(204).end();
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/eventos/:id/restaurar', (req, res) => {
+  try {
+    const evento = db.getEventoById(Number(req.params.id));
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
+    db.restaurarEvento(Number(req.params.id));
+    res.json(db.getEventoById(Number(req.params.id)));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/eventos/:id/definitivo', (req, res) => {
+  try {
+    const evento = db.getEventoById(Number(req.params.id));
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
+    db.eliminarEventoDefinitivo(Number(req.params.id));
     res.status(204).end();
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -65,6 +198,8 @@ app.delete('/api/eventos/:id', (req, res) => {
 
 app.put('/api/eventos/:id/registro', (req, res) => {
   try {
+    const evento = db.getEventoById(Number(req.params.id));
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
     db.updateRegistroAbierto(Number(req.params.id), !!req.body.registro_abierto);
     res.json(db.getEventoById(Number(req.params.id)));
   } catch (err) {
@@ -121,7 +256,7 @@ app.post('/api/eventos/:id/asistentes', (req, res) => {
     }
     const eventoId = Number(req.params.id);
     const evento = db.getEventoById(eventoId);
-    if (!evento) return res.status(404).json({ error: 'Evento no encontrado' });
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Evento no encontrado' });
     const id = db.createAsistente(eventoId, req.body);
     res.status(201).json(db.getAsistenteById(id));
   } catch (err) {
@@ -134,6 +269,10 @@ app.put('/api/asistentes/:id', (req, res) => {
     if (!req.body.nombres_apellidos || !req.body.nombres_apellidos.trim()) {
       return res.status(400).json({ error: 'Nombres y apellidos es obligatorio' });
     }
+    const asistente = db.getAsistenteById(Number(req.params.id));
+    if (!asistente) return res.status(404).json({ error: 'Asistente no encontrado' });
+    const evento = db.getEventoById(asistente.evento_id);
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Asistente no encontrado' });
     db.updateAsistente(Number(req.params.id), req.body);
     res.json(db.getAsistenteById(Number(req.params.id)));
   } catch (err) {
@@ -143,6 +282,10 @@ app.put('/api/asistentes/:id', (req, res) => {
 
 app.delete('/api/asistentes/:id', (req, res) => {
   try {
+    const asistente = db.getAsistenteById(Number(req.params.id));
+    if (!asistente) return res.status(404).json({ error: 'Asistente no encontrado' });
+    const evento = db.getEventoById(asistente.evento_id);
+    if (!puedeAccederEvento(req.ctx, evento)) return res.status(404).json({ error: 'Asistente no encontrado' });
     db.deleteAsistente(Number(req.params.id));
     res.status(204).end();
   } catch (err) {
@@ -389,7 +532,8 @@ function construirHojaEvento(workbook, colombiaImageId, vaupesImageId, evento) {
 
 app.get('/api/export/excel', async (req, res) => {
   try {
-    let eventos = db.getEventos('');
+    const departamentoId = req.ctx.modo === 'departamento' ? req.ctx.depto.id : null;
+    let eventos = db.getEventos('', { departamentoId });
     if (req.query.ids) {
       const idsSeleccionados = new Set(
         String(req.query.ids).split(',').map(id => Number(id)).filter(id => !Number.isNaN(id))

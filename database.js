@@ -64,6 +64,13 @@ async function init() {
   }
 
   db.run(`
+    CREATE TABLE IF NOT EXISTS departamentos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre TEXT NOT NULL UNIQUE,
+      token TEXT NOT NULL UNIQUE,
+      created_at TEXT DEFAULT (datetime('now','localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS eventos (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       tema_evento TEXT NOT NULL,
@@ -77,6 +84,8 @@ async function init() {
       token TEXT,
       registro_abierto INTEGER DEFAULT 1,
       tipo_formulario TEXT DEFAULT 'direccionamiento',
+      departamento_id INTEGER,
+      eliminado_en TEXT,
       created_at TEXT DEFAULT (datetime('now','localtime')),
       updated_at TEXT DEFAULT (datetime('now','localtime'))
     );
@@ -113,10 +122,44 @@ function migrateSchema() {
   if (!cols.includes('tipo_formulario')) {
     db.run("ALTER TABLE eventos ADD COLUMN tipo_formulario TEXT DEFAULT 'direccionamiento'");
   }
+  if (!cols.includes('departamento_id')) {
+    db.run('ALTER TABLE eventos ADD COLUMN departamento_id INTEGER');
+  }
+  if (!cols.includes('eliminado_en')) {
+    db.run('ALTER TABLE eventos ADD COLUMN eliminado_en TEXT');
+  }
   const sinToken = queryAll('SELECT id FROM eventos WHERE token IS NULL OR token = ?', ['']);
   sinToken.forEach(row => {
     runNoSave('UPDATE eventos SET token = ? WHERE id = ?', [crypto.randomBytes(8).toString('hex'), row.id]);
   });
+}
+
+// ---------- DEPARTAMENTOS ----------
+
+function createDepartamento(nombre) {
+  const token = crypto.randomBytes(12).toString('hex');
+  return run('INSERT INTO departamentos (nombre, token) VALUES (?, ?)', [nombre, token]);
+}
+
+function getDepartamentos() {
+  return queryAll(`
+    SELECT d.*, (SELECT COUNT(*) FROM eventos e WHERE e.departamento_id = d.id AND e.eliminado_en IS NULL) AS total_eventos
+    FROM departamentos d
+    ORDER BY d.nombre ASC
+  `);
+}
+
+function getDepartamentoById(id) {
+  return queryOne('SELECT * FROM departamentos WHERE id = ?', [id]);
+}
+
+function getDepartamentoByToken(token) {
+  return queryOne('SELECT * FROM departamentos WHERE token = ?', [token]);
+}
+
+function deleteDepartamento(id) {
+  runNoSave('UPDATE eventos SET departamento_id = NULL WHERE departamento_id = ?', [id]);
+  run('DELETE FROM departamentos WHERE id = ?', [id]);
 }
 
 // ---------- EVENTOS ----------
@@ -124,8 +167,8 @@ function migrateSchema() {
 function createEvento(data) {
   const token = crypto.randomBytes(8).toString('hex');
   return run(
-    `INSERT INTO eventos (tema_evento, organizado_por, ciudad, lugar, fecha, hora_inicio, hora_final, observaciones, token, registro_abierto, tipo_formulario)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+    `INSERT INTO eventos (tema_evento, organizado_por, ciudad, lugar, fecha, hora_inicio, hora_final, observaciones, token, registro_abierto, tipo_formulario, departamento_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       data.tema_evento || '',
       data.organizado_por || '',
@@ -136,7 +179,8 @@ function createEvento(data) {
       data.hora_final || '',
       data.observaciones || '',
       token,
-      data.tipo_formulario || 'direccionamiento'
+      data.tipo_formulario || 'direccionamiento',
+      data.departamento_id || null
     ]
   );
 }
@@ -151,7 +195,7 @@ function getEventoByToken(token) {
 
 function updateEvento(id, data) {
   run(
-    `UPDATE eventos SET tema_evento=?, organizado_por=?, ciudad=?, lugar=?, fecha=?, hora_inicio=?, hora_final=?, observaciones=?, tipo_formulario=?, updated_at=datetime('now','localtime')
+    `UPDATE eventos SET tema_evento=?, organizado_por=?, ciudad=?, lugar=?, fecha=?, hora_inicio=?, hora_final=?, observaciones=?, tipo_formulario=?, departamento_id=?, updated_at=datetime('now','localtime')
      WHERE id=?`,
     [
       data.tema_evento || '',
@@ -163,24 +207,38 @@ function updateEvento(id, data) {
       data.hora_final || '',
       data.observaciones || '',
       data.tipo_formulario || 'direccionamiento',
+      data.departamento_id || null,
       id
     ]
   );
 }
 
 function deleteEvento(id) {
+  run("UPDATE eventos SET eliminado_en = datetime('now','localtime') WHERE id = ?", [id]);
+}
+
+function restaurarEvento(id) {
+  run('UPDATE eventos SET eliminado_en = NULL WHERE id = ?', [id]);
+}
+
+function eliminarEventoDefinitivo(id) {
   runNoSave('DELETE FROM asistentes WHERE evento_id = ?', [id]);
   run('DELETE FROM eventos WHERE id = ?', [id]);
 }
 
-function getEventos(search) {
+function getEventos(search, { departamentoId = null, papelera = false } = {}) {
   let sql = `
     SELECT e.*, (SELECT COUNT(*) FROM asistentes a WHERE a.evento_id = e.id) AS total_asistentes
     FROM eventos e
+    WHERE e.eliminado_en IS ${papelera ? 'NOT' : ''} NULL
   `;
   const params = [];
+  if (departamentoId) {
+    sql += ' AND e.departamento_id = ?';
+    params.push(departamentoId);
+  }
   if (search && search.trim()) {
-    sql += ` WHERE e.tema_evento LIKE ? OR e.organizado_por LIKE ? OR e.ciudad LIKE ? OR e.lugar LIKE ? OR e.fecha LIKE ?`;
+    sql += ` AND (e.tema_evento LIKE ? OR e.organizado_por LIKE ? OR e.ciudad LIKE ? OR e.lugar LIKE ? OR e.fecha LIKE ?)`;
     const like = `%${search.trim()}%`;
     params.push(like, like, like, like, like);
   }
@@ -268,9 +326,16 @@ function getAllAsistentesForExport() {
 
 module.exports = {
   init,
+  createDepartamento,
+  getDepartamentos,
+  getDepartamentoById,
+  getDepartamentoByToken,
+  deleteDepartamento,
   createEvento,
   updateEvento,
   deleteEvento,
+  restaurarEvento,
+  eliminarEventoDefinitivo,
   getEventos,
   getEventoById,
   getEventoByToken,

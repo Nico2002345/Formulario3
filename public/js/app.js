@@ -4,7 +4,8 @@
   const state = {
     eventoActualId: null,
     asistentesCache: [],
-    eventosCache: []
+    eventosCache: [],
+    sesion: { modo: 'maestro' }
   };
 
   const AUTO_REFRESH_MS = 5000;
@@ -61,12 +62,41 @@
     return `${window.location.origin}/r/${token}`;
   }
 
+  function linkDepartamento(token) {
+    return `${window.location.origin}/admin/${token}`;
+  }
+
+  // ---------- Sesión / Departamento ----------
+
+  async function cargarSesion() {
+    const sesion = await api('/api/sesion');
+    state.sesion = sesion;
+
+    if (sesion.modo === 'invalido') {
+      $('#appMain').classList.add('d-none');
+      $('#sesionInvalida').classList.remove('d-none');
+      return false;
+    }
+
+    if (sesion.modo === 'departamento') {
+      $('#headerSubtitle').textContent = `Departamento: ${sesion.departamento.nombre}`;
+      $('#btnDepartamentos').classList.add('d-none');
+      $('#departamentoField').classList.add('d-none');
+    } else {
+      $('#headerSubtitle').textContent = 'Vista general · Todos los departamentos';
+      $('#btnDepartamentos').classList.remove('d-none');
+      $('#departamentoField').classList.remove('d-none');
+    }
+    return true;
+  }
+
   // ---------- Vistas ----------
 
   function mostrarVistaEventos() {
     detenerAutoRefresco();
     $('#view-eventos').classList.remove('d-none');
     $('#view-detalle').classList.add('d-none');
+    $('#view-papelera').classList.add('d-none');
     state.eventoActualId = null;
     cargarEventos();
   }
@@ -74,9 +104,19 @@
   function mostrarVistaDetalle(id) {
     $('#view-eventos').classList.add('d-none');
     $('#view-detalle').classList.remove('d-none');
+    $('#view-papelera').classList.add('d-none');
     state.eventoActualId = id;
     cargarDetalle(id);
     iniciarAutoRefresco();
+  }
+
+  function mostrarVistaPapelera() {
+    detenerAutoRefresco();
+    $('#view-eventos').classList.add('d-none');
+    $('#view-detalle').classList.add('d-none');
+    $('#view-papelera').classList.remove('d-none');
+    state.eventoActualId = null;
+    cargarPapelera();
   }
 
   function hayModalAbierto() {
@@ -149,12 +189,27 @@
     cont.querySelectorAll('[data-eliminar]').forEach(b => b.addEventListener('click', () => eliminarEvento(Number(b.dataset.eliminar))));
   }
 
+  async function poblarDepartamentoOptions(seleccionado) {
+    if (state.sesion.modo !== 'maestro') return;
+    const sel = $('#departamento_id');
+    const departamentos = await api('/api/departamentos');
+    sel.innerHTML = '<option value="">Sin asignar</option>';
+    departamentos.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.id;
+      opt.textContent = d.nombre;
+      sel.appendChild(opt);
+    });
+    sel.value = seleccionado || '';
+  }
+
   async function abrirModalEvento(id) {
     const form = $('#formEvento');
     form.reset();
     $('#eventoId').value = '';
     $('#modalEventoTitulo').textContent = 'Nuevo evento';
     $('#tipo_formulario').value = FORMULARIOS[0].value;
+    await poblarDepartamentoOptions(null);
 
     if (id) {
       const ev = await api(`/api/eventos/${id}`);
@@ -169,6 +224,7 @@
       $('#hora_final').value = ev.hora_final || '';
       $('#observaciones').value = ev.observaciones || '';
       $('#tipo_formulario').value = ev.tipo_formulario || FORMULARIOS[0].value;
+      if (state.sesion.modo === 'maestro') $('#departamento_id').value = ev.departamento_id || '';
     }
 
     new bootstrap.Modal($('#modalEvento')).show();
@@ -186,7 +242,8 @@
       hora_inicio: $('#hora_inicio').value,
       hora_final: $('#hora_final').value,
       observaciones: $('#observaciones').value.trim(),
-      tipo_formulario: $('#tipo_formulario').value
+      tipo_formulario: $('#tipo_formulario').value,
+      departamento_id: $('#departamento_id').value || null
     };
 
     try {
@@ -206,14 +263,139 @@
   }
 
   async function eliminarEvento(id) {
-    if (!confirm('¿Eliminar este evento y todos sus asistentes registrados? Esta acción no se puede deshacer.')) return;
+    if (!confirm('¿Enviar este evento a la Papelera? Sus asistentes se conservan y puedes restaurarlo luego desde ahí.')) return;
     try {
       await api(`/api/eventos/${id}`, { method: 'DELETE' });
-      toast('Evento eliminado');
+      toast('Evento movido a la Papelera');
       mostrarVistaEventos();
     } catch (err) {
       toast(err.message);
     }
+  }
+
+  // ---------- Papelera ----------
+
+  async function cargarPapelera() {
+    const eventos = await api('/api/eventos?papelera=1');
+    const cont = $('#papeleraContainer');
+    cont.innerHTML = '';
+    $('#papeleraVacio').classList.toggle('d-none', eventos.length > 0);
+
+    eventos.forEach(ev => {
+      const col = document.createElement('div');
+      col.className = 'col-12 col-md-6 col-xl-4';
+      col.innerHTML = `
+        <div class="card evento-card">
+          <div class="card-body d-flex flex-column">
+            <h3 class="card-title h6 mb-2">${escapeHtml(ev.tema_evento)}</h3>
+            <div class="text-muted small mb-2">
+              <div><i class="bi bi-calendar3"></i> ${escapeHtml(formatFecha(ev.fecha)) || 'Sin fecha'}</div>
+              <div><i class="bi bi-people"></i> ${ev.total_asistentes} asistentes</div>
+            </div>
+            <div class="mt-auto d-flex gap-2">
+              <button class="btn btn-sm btn-outline-primary flex-fill" data-restaurar="${ev.id}"><i class="bi bi-arrow-counterclockwise"></i> Restaurar</button>
+              <button class="btn btn-sm btn-outline-danger" data-eliminar-definitivo="${ev.id}"><i class="bi bi-trash3"></i> Eliminar definitivo</button>
+            </div>
+          </div>
+        </div>
+      `;
+      cont.appendChild(col);
+    });
+
+    cont.querySelectorAll('[data-restaurar]').forEach(b =>
+      b.addEventListener('click', () => restaurarEvento(Number(b.dataset.restaurar))));
+    cont.querySelectorAll('[data-eliminar-definitivo]').forEach(b =>
+      b.addEventListener('click', () => eliminarEventoDefinitivo(Number(b.dataset.eliminarDefinitivo))));
+  }
+
+  async function restaurarEvento(id) {
+    try {
+      await api(`/api/eventos/${id}/restaurar`, { method: 'POST' });
+      toast('Evento restaurado');
+      cargarPapelera();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  async function eliminarEventoDefinitivo(id) {
+    if (!confirm('¿Eliminar este evento y todos sus asistentes de forma permanente? Esta acción no se puede deshacer.')) return;
+    try {
+      await api(`/api/eventos/${id}/definitivo`, { method: 'DELETE' });
+      toast('Evento eliminado definitivamente');
+      cargarPapelera();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // ---------- Departamentos ----------
+
+  async function cargarDepartamentos() {
+    const departamentos = await api('/api/departamentos');
+    const cont = $('#departamentosContainer');
+    cont.innerHTML = '';
+    $('#departamentosVacio').classList.toggle('d-none', departamentos.length > 0);
+
+    departamentos.forEach(d => {
+      const url = linkDepartamento(d.token);
+      const div = document.createElement('div');
+      div.className = 'border rounded p-2 mb-2';
+      div.innerHTML = `
+        <div class="d-flex justify-content-between align-items-center mb-1">
+          <span class="fw-semibold">${escapeHtml(d.nombre)}</span>
+          <span class="badge text-bg-light border">${d.total_eventos} evento(s)</span>
+        </div>
+        <div class="input-group input-group-sm mb-1">
+          <input type="text" class="form-control" value="${escapeHtml(url)}" readonly>
+          <button class="btn btn-outline-primary" type="button" data-copiar-depto="${escapeHtml(url)}"><i class="bi bi-clipboard"></i></button>
+        </div>
+        <button class="btn btn-sm btn-outline-danger" data-eliminar-depto="${d.id}"><i class="bi bi-trash"></i> Eliminar departamento</button>
+      `;
+      cont.appendChild(div);
+    });
+
+    cont.querySelectorAll('[data-copiar-depto]').forEach(b =>
+      b.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(b.dataset.copiarDepto);
+          toast('Link copiado');
+        } catch (_) {
+          toast('No se pudo copiar el link');
+        }
+      }));
+    cont.querySelectorAll('[data-eliminar-depto]').forEach(b =>
+      b.addEventListener('click', () => eliminarDepartamento(Number(b.dataset.eliminarDepto))));
+  }
+
+  async function crearDepartamento(e) {
+    e.preventDefault();
+    const nombre = $('#nuevoDepartamentoNombre').value.trim();
+    if (!nombre) return;
+    try {
+      await api('/api/departamentos', { method: 'POST', body: JSON.stringify({ nombre }) });
+      $('#nuevoDepartamentoNombre').value = '';
+      toast('Departamento creado');
+      cargarDepartamentos();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  async function eliminarDepartamento(id) {
+    if (!confirm('¿Eliminar este departamento? Sus eventos no se borran, quedan sin asignar y solo visibles en la vista general.')) return;
+    try {
+      await api(`/api/departamentos/${id}`, { method: 'DELETE' });
+      toast('Departamento eliminado');
+      cargarDepartamentos();
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  function abrirModalDepartamentos() {
+    cargarDepartamentos();
+    new bootstrap.Modal($('#modalDepartamentos')).show();
   }
 
   // ---------- Compartir / registro público ----------
@@ -515,7 +697,10 @@
 
   let firmaPad;
 
-  function init() {
+  async function init() {
+    const sesionValida = await cargarSesion();
+    if (!sesionValida) return;
+
     firmaPad = createSignaturePad($('#firmaCanvas'));
     $('#btnLimpiarFirma').addEventListener('click', () => firmaPad.clear());
     renderGrupoEtareoOptions();
@@ -538,6 +723,11 @@
     $('#btnCopiarLink').addEventListener('click', copiarLinkRegistro);
     $('#switchRegistroAbierto').addEventListener('change', toggleRegistroAbierto);
     $('#btnCompartirDesdeDetalle').addEventListener('click', () => abrirModalCompartir(state.eventoActualId));
+
+    $('#btnPapelera').addEventListener('click', mostrarVistaPapelera);
+    $('#btnVolverPapelera').addEventListener('click', mostrarVistaEventos);
+    $('#btnDepartamentos').addEventListener('click', abrirModalDepartamentos);
+    $('#formDepartamento').addEventListener('submit', crearDepartamento);
 
     mostrarVistaEventos();
   }

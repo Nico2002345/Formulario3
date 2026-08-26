@@ -35,15 +35,24 @@ function getAdminSessionToken() {
   return crypto.createHmac('sha256', secret).update('admin-session').digest('hex');
 }
 
-function esAdminValido(req) {
+function tieneSesionAdminValida(req) {
   const expected = getAdminSessionToken();
-  if (!expected) return true; // sin ADMIN_PASSWORD configurado, no se exige login (comportamiento anterior)
+  if (!expected) return false; // sin ADMIN_PASSWORD configurado no existe "sesión admin" real
   const cookie = getCookie(req, ADMIN_COOKIE);
   if (!cookie || cookie.length !== expected.length) return false;
   return crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(expected));
 }
 
+function esAdminValido(req) {
+  if (!process.env.ADMIN_PASSWORD) return true; // sin ADMIN_PASSWORD configurado, no se exige login (comportamiento anterior)
+  return tieneSesionAdminValida(req);
+}
+
 function resolveContexto(req) {
+  // Una sesión de admin ya autenticada con contraseña siempre gana, aunque el
+  // navegador tenga guardada una cookie vieja de algún link de departamento.
+  if (tieneSesionAdminValida(req)) return { modo: 'maestro' };
+
   const token = getCookie(req, DEPT_COOKIE);
   if (token) {
     const depto = db.getDepartamentoByToken(token);

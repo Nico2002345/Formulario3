@@ -216,23 +216,30 @@
     cont.innerHTML = '';
     $('#eventosVacio').classList.toggle('d-none', eventos.length > 0);
 
+    let agrupado = false;
     if (state.sesion.modo === 'maestro' && eventos.length > 0) {
-      const departamentos = await api('/api/departamentos');
-      const porDepto = new Map(departamentos.map(d => [d.id, []]));
-      const sinAsignar = [];
-      eventos.forEach(ev => {
-        if (ev.departamento_id && porDepto.has(ev.departamento_id)) {
-          porDepto.get(ev.departamento_id).push(ev);
-        } else {
-          sinAsignar.push(ev);
+      try {
+        const departamentos = await api('/api/departamentos');
+        const porDepto = new Map(departamentos.map(d => [d.id, []]));
+        const sinAsignar = [];
+        eventos.forEach(ev => {
+          if (ev.departamento_id && porDepto.has(ev.departamento_id)) {
+            porDepto.get(ev.departamento_id).push(ev);
+          } else {
+            sinAsignar.push(ev);
+          }
+        });
+        departamentos.filter(d => porDepto.get(d.id).length > 0)
+          .forEach(d => renderGrupoEventos(cont, d.nombre, porDepto.get(d.id)));
+        if (sinAsignar.length) {
+          renderGrupoEventos(cont, 'Sin asignar', sinAsignar);
         }
-      });
-      departamentos.filter(d => porDepto.get(d.id).length > 0)
-        .forEach(d => renderGrupoEventos(cont, d.nombre, porDepto.get(d.id)));
-      if (sinAsignar.length) {
-        renderGrupoEventos(cont, 'Sin asignar', sinAsignar);
+        agrupado = true;
+      } catch (err) {
+        cont.innerHTML = '';
       }
-    } else {
+    }
+    if (!agrupado) {
       eventos.forEach(ev => cont.appendChild(renderEventoCard(ev)));
     }
 
@@ -242,15 +249,19 @@
   async function poblarDepartamentoOptions(seleccionado) {
     if (state.sesion.modo !== 'maestro') return;
     const sel = $('#departamento_id');
-    const departamentos = await api('/api/departamentos');
-    sel.innerHTML = '<option value="">Sin asignar</option>';
-    departamentos.forEach(d => {
-      const opt = document.createElement('option');
-      opt.value = d.id;
-      opt.textContent = d.nombre;
-      sel.appendChild(opt);
-    });
-    sel.value = seleccionado || '';
+    try {
+      const departamentos = await api('/api/departamentos');
+      sel.innerHTML = '<option value="">Sin asignar</option>';
+      departamentos.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id;
+        opt.textContent = d.nombre;
+        sel.appendChild(opt);
+      });
+      sel.value = seleccionado || '';
+    } catch (err) {
+      toast('No se pudo cargar la lista de departamentos');
+    }
   }
 
   async function abrirModalEvento(id) {
@@ -262,19 +273,24 @@
     await poblarDepartamentoOptions(null);
 
     if (id) {
-      const ev = await api(`/api/eventos/${id}`);
-      $('#modalEventoTitulo').textContent = 'Editar evento';
-      $('#eventoId').value = ev.id;
-      $('#tema_evento').value = ev.tema_evento || '';
-      $('#organizado_por').value = ev.organizado_por || '';
-      $('#ciudad').value = ev.ciudad || '';
-      $('#lugar').value = ev.lugar || '';
-      $('#fecha').value = ev.fecha || '';
-      $('#hora_inicio').value = ev.hora_inicio || '';
-      $('#hora_final').value = ev.hora_final || '';
-      $('#observaciones').value = ev.observaciones || '';
-      $('#tipo_formulario').value = ev.tipo_formulario || FORMULARIOS[0].value;
-      if (state.sesion.modo === 'maestro') $('#departamento_id').value = ev.departamento_id || '';
+      try {
+        const ev = await api(`/api/eventos/${id}`);
+        $('#modalEventoTitulo').textContent = 'Editar evento';
+        $('#eventoId').value = ev.id;
+        $('#tema_evento').value = ev.tema_evento || '';
+        $('#organizado_por').value = ev.organizado_por || '';
+        $('#ciudad').value = ev.ciudad || '';
+        $('#lugar').value = ev.lugar || '';
+        $('#fecha').value = ev.fecha || '';
+        $('#hora_inicio').value = ev.hora_inicio || '';
+        $('#hora_final').value = ev.hora_final || '';
+        $('#observaciones').value = ev.observaciones || '';
+        $('#tipo_formulario').value = ev.tipo_formulario || FORMULARIOS[0].value;
+        if (state.sesion.modo === 'maestro') $('#departamento_id').value = ev.departamento_id || '';
+      } catch (err) {
+        toast(err.message);
+        return;
+      }
     }
 
     new bootstrap.Modal($('#modalEvento')).show();

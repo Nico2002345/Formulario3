@@ -193,6 +193,11 @@
 
   const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+  function claveAnio(fecha) {
+    const m = /^(\d{4})/.exec(fecha || '');
+    return m ? m[1] : 'sin-fecha';
+  }
+
   function claveMes(fecha) {
     const m = /^(\d{4})-(\d{2})/.exec(fecha || '');
     return m ? `${m[1]}-${m[2]}` : 'sin-fecha';
@@ -220,14 +225,29 @@
     return claves.map(clave => ({ clave, etiqueta: etiquetaMes(clave), eventos: grupos.get(clave) }));
   }
 
-  function renderCarpetaMes(cont, etiqueta, eventos, folderId, abiertaPorDefecto) {
+  function agruparPorAnio(eventos) {
+    const grupos = new Map();
+    eventos.forEach(ev => {
+      const anio = claveAnio(ev.fecha);
+      if (!grupos.has(anio)) grupos.set(anio, []);
+      grupos.get(anio).push(ev);
+    });
+    const anios = Array.from(grupos.keys()).sort((a, b) => {
+      if (a === 'sin-fecha') return 1;
+      if (b === 'sin-fecha') return -1;
+      return b.localeCompare(a);
+    });
+    return anios.map(anio => ({ anio, eventos: grupos.get(anio) }));
+  }
+
+  function renderCarpeta(cont, { etiqueta, eventos, folderId, abiertaPorDefecto, icono, extraClass }) {
     const wrapper = document.createElement('div');
     wrapper.className = 'col-12';
     wrapper.innerHTML = `
-      <div class="folder-mes">
+      <div class="folder-mes${extraClass ? ' ' + extraClass : ''}">
         <button type="button" class="folder-mes-toggle${abiertaPorDefecto ? ' is-open' : ''}" data-folder-target="${folderId}" aria-expanded="${abiertaPorDefecto ? 'true' : 'false'}">
           <i class="bi bi-chevron-right folder-chevron"></i>
-          <i class="bi bi-folder2 folder-icon"></i>
+          <i class="bi ${icono} folder-icon"></i>
           <span class="folder-label">${escapeHtml(etiqueta)}</span>
           <span class="badge text-bg-light border ms-auto">${eventos.length}</span>
         </button>
@@ -235,8 +255,27 @@
       </div>
     `;
     cont.appendChild(wrapper);
-    const body = wrapper.querySelector(`#${folderId}`);
+    return wrapper.querySelector(`#${folderId}`);
+  }
+
+  function renderCarpetaMes(cont, etiqueta, eventos, folderId, abiertaPorDefecto) {
+    const body = renderCarpeta(cont, { etiqueta, eventos, folderId, abiertaPorDefecto, icono: 'bi-folder2', extraClass: 'folder-mes--sub' });
     eventos.forEach(ev => body.appendChild(renderEventoCard(ev)));
+  }
+
+  function renderCarpetaAnio(cont, anio, eventos, idPrefix, abiertaPorDefecto) {
+    const etiqueta = anio === 'sin-fecha' ? 'Sin fecha' : anio;
+    const folderId = `folder-anio-${idPrefix}-${anio}`;
+    const body = renderCarpeta(cont, { etiqueta, eventos, folderId, abiertaPorDefecto, icono: 'bi-calendar3', extraClass: 'folder-mes--anio' });
+
+    if (anio === 'sin-fecha') {
+      eventos.forEach(ev => body.appendChild(renderEventoCard(ev)));
+      return;
+    }
+
+    agruparPorMes(eventos).forEach((g, idx) => {
+      renderCarpetaMes(body, g.etiqueta, g.eventos, `folder-mes-${idPrefix}-${anio}-${g.clave}`, idx === 0);
+    });
   }
 
   function renderGrupoEventos(cont, nombre, eventos, idPrefix) {
@@ -253,8 +292,8 @@
       return;
     }
 
-    agruparPorMes(eventos).forEach((g, idx) => {
-      renderCarpetaMes(cont, g.etiqueta, g.eventos, `folder-${idPrefix}-${g.clave}`, idx === 0);
+    agruparPorAnio(eventos).forEach((g, idx) => {
+      renderCarpetaAnio(cont, g.anio, g.eventos, idPrefix, idx === 0);
     });
   }
 
@@ -290,8 +329,8 @@
       }
     }
     if (!agrupado) {
-      agruparPorMes(eventos).forEach((g, idx) => {
-        renderCarpetaMes(cont, g.etiqueta, g.eventos, `folder-global-${g.clave}`, idx === 0);
+      agruparPorAnio(eventos).forEach((g, idx) => {
+        renderCarpetaAnio(cont, g.anio, g.eventos, 'global', idx === 0);
       });
     }
 

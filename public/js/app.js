@@ -191,7 +191,55 @@
     cont.querySelectorAll('[data-eliminar]').forEach(b => b.addEventListener('click', () => eliminarEvento(Number(b.dataset.eliminar))));
   }
 
-  function renderGrupoEventos(cont, nombre, eventos) {
+  const MESES_ES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+  function claveMes(fecha) {
+    const m = /^(\d{4})-(\d{2})/.exec(fecha || '');
+    return m ? `${m[1]}-${m[2]}` : 'sin-fecha';
+  }
+
+  function etiquetaMes(clave) {
+    if (clave === 'sin-fecha') return 'Sin fecha';
+    const [anio, mes] = clave.split('-');
+    const nombre = MESES_ES[Number(mes) - 1] || mes;
+    return `${nombre.charAt(0).toUpperCase()}${nombre.slice(1)} ${anio}`;
+  }
+
+  function agruparPorMes(eventos) {
+    const grupos = new Map();
+    eventos.forEach(ev => {
+      const clave = claveMes(ev.fecha);
+      if (!grupos.has(clave)) grupos.set(clave, []);
+      grupos.get(clave).push(ev);
+    });
+    const claves = Array.from(grupos.keys()).sort((a, b) => {
+      if (a === 'sin-fecha') return 1;
+      if (b === 'sin-fecha') return -1;
+      return b.localeCompare(a);
+    });
+    return claves.map(clave => ({ clave, etiqueta: etiquetaMes(clave), eventos: grupos.get(clave) }));
+  }
+
+  function renderCarpetaMes(cont, etiqueta, eventos, folderId, abiertaPorDefecto) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'col-12';
+    wrapper.innerHTML = `
+      <div class="folder-mes">
+        <button type="button" class="folder-mes-toggle${abiertaPorDefecto ? ' is-open' : ''}" data-folder-target="${folderId}" aria-expanded="${abiertaPorDefecto ? 'true' : 'false'}">
+          <i class="bi bi-chevron-right folder-chevron"></i>
+          <i class="bi bi-folder2 folder-icon"></i>
+          <span class="folder-label">${escapeHtml(etiqueta)}</span>
+          <span class="badge text-bg-light border ms-auto">${eventos.length}</span>
+        </button>
+        <div class="row g-3 folder-mes-body${abiertaPorDefecto ? '' : ' d-none'}" id="${folderId}"></div>
+      </div>
+    `;
+    cont.appendChild(wrapper);
+    const body = wrapper.querySelector(`#${folderId}`);
+    eventos.forEach(ev => body.appendChild(renderEventoCard(ev)));
+  }
+
+  function renderGrupoEventos(cont, nombre, eventos, idPrefix) {
     const header = document.createElement('div');
     header.className = 'col-12';
     header.innerHTML = `<h3 class="h6 text-muted border-bottom pb-1 mb-2 mt-2"><i class="bi bi-building"></i> ${escapeHtml(nombre)} <span class="badge text-bg-light border">${eventos.length}</span></h3>`;
@@ -205,7 +253,9 @@
       return;
     }
 
-    eventos.forEach(ev => cont.appendChild(renderEventoCard(ev)));
+    agruparPorMes(eventos).forEach((g, idx) => {
+      renderCarpetaMes(cont, g.etiqueta, g.eventos, `folder-${idPrefix}-${g.clave}`, idx === 0);
+    });
   }
 
   async function cargarEventos() {
@@ -230,9 +280,9 @@
           }
         });
         departamentos.filter(d => porDepto.get(d.id).length > 0)
-          .forEach(d => renderGrupoEventos(cont, d.nombre, porDepto.get(d.id)));
+          .forEach(d => renderGrupoEventos(cont, d.nombre, porDepto.get(d.id), `d${d.id}`));
         if (sinAsignar.length) {
-          renderGrupoEventos(cont, 'Sin asignar', sinAsignar);
+          renderGrupoEventos(cont, 'Sin asignar', sinAsignar, 'sa');
         }
         agrupado = true;
       } catch (err) {
@@ -240,7 +290,9 @@
       }
     }
     if (!agrupado) {
-      eventos.forEach(ev => cont.appendChild(renderEventoCard(ev)));
+      agruparPorMes(eventos).forEach((g, idx) => {
+        renderCarpetaMes(cont, g.etiqueta, g.eventos, `folder-global-${g.clave}`, idx === 0);
+      });
     }
 
     bindEventoCardHandlers(cont);
@@ -775,6 +827,16 @@
     $('#btnNuevoEvento').addEventListener('click', () => abrirModalEvento(null));
     $('#formEvento').addEventListener('submit', guardarEvento);
     $('#buscarEvento').addEventListener('input', debounce(cargarEventos, 300));
+    $('#eventosContainer').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-folder-target]');
+      if (!btn) return;
+      const body = document.getElementById(btn.dataset.folderTarget);
+      if (!body) return;
+      const abrir = body.classList.contains('d-none');
+      body.classList.toggle('d-none', !abrir);
+      btn.classList.toggle('is-open', abrir);
+      btn.setAttribute('aria-expanded', String(abrir));
+    });
     $('#btnExportExcel').addEventListener('click', abrirModalExportar);
     $('#exportarSeleccionarTodos').addEventListener('change', toggleSeleccionarTodosExportar);
     $('#btnConfirmarExportar').addEventListener('click', confirmarExportar);

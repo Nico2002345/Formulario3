@@ -108,6 +108,44 @@ body {
   font-size: .875rem;
 }
 
+.folder-mes {
+  margin-bottom: .5rem;
+}
+
+.folder-mes-toggle {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: .4rem .25rem;
+  font-weight: 600;
+  color: #495057;
+  text-align: left;
+  border-radius: .375rem;
+}
+
+.folder-mes-toggle:hover {
+  background: rgba(0,0,0,.04);
+}
+
+.folder-mes-toggle .folder-chevron {
+  transition: transform .15s ease;
+}
+
+.folder-mes-toggle.is-open .folder-chevron {
+  transform: rotate(90deg);
+}
+
+.folder-mes-toggle .folder-icon {
+  color: var(--brand);
+}
+
+.folder-mes-body {
+  padding: .5rem 0 .75rem 1.5rem;
+}
+
 @media (max-width: 576px) {
   .header-title h1 {
     font-size: 1.1rem;

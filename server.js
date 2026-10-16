@@ -380,15 +380,15 @@ const GRUPOS_VALOR = [
 
 const FORMULARIOS = {
   direccionamiento: {
-    label: 'Direccionamiento Estratégico y Articulación Regional',
-    proceso: 'Direccionamiento Estratégico y Articulación Regional',
+    label: 'Direccionamiento Estratégico y Articulación Regional (Órganos Consultivos)',
+    proceso: 'Direccionamiento Estratégico y Articulación Regional (Órganos Consultivos)',
     formato: 'Lista de asistencia ',
     codigo: 'ES-DE-PR002-16-4.2',
     version: 3
   },
   asistencia_territorial: {
-    label: 'Asistencia territorial y desarrollo institucional',
-    proceso: 'Asistencia territorial y desarrollo institucional',
+    label: 'Asistencia Territorial y Desarrollo Institucional (Asistencia Técnica)',
+    proceso: 'Asistencia Territorial y Desarrollo Institucional (Asistencia Técnica)',
     formato: 'Lista de asistencia ',
     codigo: 'MI-AT-FO002-1-2',
     version: 2
